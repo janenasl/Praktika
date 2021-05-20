@@ -13,5 +13,8 @@ $(BIN): main.o math_functions.o
 install:
 	install -m 644 $(LIB) $(DESTDIR)$(PREFIX)/include
 
+uninstall:
+	$(RM) $(PREFIX)/include/$(LIB)
+
 clean:
 	rm -f $(BIN) $(OBJS)
