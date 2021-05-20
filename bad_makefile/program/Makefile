@@ -10,7 +10,7 @@ all: $(BIN)
 $(BIN): main.o math_functions.o
 	$(CC) $(CFlags) -o $@ $^
 
-install:
+install:a
 	install -m 644 $(LIB) $(DESTDIR)$(PREFIX)/include
 
 uninstall:
