@@ -2,7 +2,7 @@ CC:=gcc
 CFlags:=-Wall
 SRC:= $(wildcard *.c)
 OBJ:=$(SRC:.c=.o)
-LIB:=usage.h maths.h
+LIB:=${wildcard *.h}
 BIN:=calculator
 PREFIX ?= /usr
 
