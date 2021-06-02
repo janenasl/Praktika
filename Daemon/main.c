@@ -58,8 +58,6 @@ int main(int argc, char* argv[])
     char owner[20]; 
     config = read_config();
 
-    find_owner();
-
     struct passwd* pw;
 
     if( ( pw = getpwuid( getuid() ) ) == NULL ) {
