@@ -42,23 +42,25 @@ char *checkFiles(char *path);
 char *checkNewFiles(char *path, char *oldfiles);
 char *get_filename_ext(char *filename);
 int check_extensions(char *types, char *extension);
+char *find_file_name(char *str);
+int check_if_dir_exists(char *dir);
 struct config read_config();
 
 int main(int argc, char* argv[])
 {
    // daemon_process();
     struct config config;
+    struct passwd* pw;
     FILE *fp = NULL;
 
     int file_count = 0;
     int new_file_count = 0;
     char log_file[14]; 
-    char *first_files = malloc (sizeof(first_files) * 500);
-    char *new_files = malloc (sizeof(first_files) * 500);
+    char *first_files = malloc (sizeof(first_files) * 1000);
+    char *new_files = malloc (sizeof(first_files) * 1000);
     char owner[20]; 
-    config = read_config();
 
-    struct passwd* pw;
+    config = read_config();
 
     if( ( pw = getpwuid( getuid() ) ) == NULL ) {
        fprintf( stderr,
@@ -78,8 +80,6 @@ int main(int argc, char* argv[])
 
     strcpy(first_files,checkFiles(config.dir_to_watch));
 
-    printf("%s \n", first_files);
-
     fprintf(fp, "starting: %d\n", file_count);
 
     while(1) {
@@ -89,7 +89,6 @@ int main(int argc, char* argv[])
             fprintf(fp, "%d\n", new_file_count);
             strcpy(new_files,checkNewFiles(config.dir_to_watch, first_files));
             movingFiles(new_files, config, owner);
-
             file_count = new_file_count;
         }
         fflush(fp);
@@ -104,31 +103,38 @@ int movingFiles(char *files, struct config config, char *owner) {
     const char delimiter[2] = ",";
     char *token;
     char *extension;
-    char directory[50];
+    char *temp_token = malloc(sizeof(temp_token) * 200);
+    char directory[500];
+
+    char *file_name = malloc(sizeof(file_name) * 500);
 
     token = strtok(files, delimiter);
    
     while( token != NULL ) {
+        printf("tokenas: %s \n", token);
         extension = get_filename_ext(token);
-
+        strcpy(file_name, find_file_name(token));
         if (check_extensions(config.photo_type.types, extension) == 0 ){
             printf("FAILAS KELIAMAS\n");
-            sprintf(directory, "/home/%s/Pictures/%s", owner, token);
+            sprintf(directory, "/home/%s/Pictures/", owner);
+            check_if_dir_exists("/home/ragaaaas");
+            sprintf(directory, "/home/%s/Pictures/%s", owner, file_name);
             if (rename(token, directory) != 0) {
                 printf("nepavyko :( \n");
             }
         }
         else if (check_extensions(config.video_type.types, extension) == 0){
             printf("FAILAS KELIAMAS\n");
-            sprintf(directory, "/home/%s/Videos/%s", owner, token);
+            sprintf(directory, "/home/%s/Videos/%s", owner, file_name);
             if (rename(token, directory) != 0) {
                 printf("nepavyko :( \n");
             }
         }
         else if (check_extensions(config.document_type.types, extension) == 0){
             printf("FAILAS KELIAMAS\n");
-            sprintf(directory, "/home/%s/Documents/%s", owner, token);
+            sprintf(directory, "/home/%s/Documents/%s", owner, file_name);
             printf("dokumentas: %s\n", directory);
+            printf("tokenas: %s\n", token);
             if (rename(token, directory) != 0) {
                 perror("Error");
                 printf("nepavyko :( \n");
@@ -136,16 +142,36 @@ int movingFiles(char *files, struct config config, char *owner) {
         }
         else if (check_extensions(config.audio_type.types, extension)==0){
             printf("FAILAS KELIAMAS\n");
-            sprintf(directory, "/home/%s/Music/%s", owner, token);
+            sprintf(directory, "/home/%s/Music/%s", owner, file_name);
             if (rename(token, directory) != 0) {
                 printf("nepavyko :( \n");
             }
         }
-
-    
         token = strtok(NULL, delimiter);
    }
+}
 
+int check_if_dir_exists(char *dir) {
+
+    FILE *fptr = fopen(dir, "r");
+
+    // If file does not exists 
+    if (fptr == NULL){
+        mkdir(dir, 0777);
+        printf("CREATED\n");
+        return 0;
+    }
+    
+    return 0;
+}
+
+char *find_file_name(char *str) {
+        char *file_name = strrchr(str, '/');
+    if(!file_name || file_name == str) {
+        return "";
+    }
+    printf("failo vardas: %s\n", file_name);
+    return file_name + 1;
 }
 
 int check_extensions(char *types, char *extension) {
@@ -204,7 +230,7 @@ char *checkFiles(char *path) {
     DIR *dir = NULL;
     struct dirent *direntp = NULL;
     char *npath;
-    char *file_names = malloc (sizeof(file_names) * 500);
+    char *file_names = malloc (sizeof(file_names) * 1000);
     strcpy(file_names, "");
     
 
@@ -225,6 +251,8 @@ char *checkFiles(char *path) {
 
         switch (direntp->d_type) {
             case DT_REG:
+                strcat(file_names, path);
+                strcat(file_names, "/");
                 strcat(file_names, direntp->d_name);
                 strcat(file_names, ",");
                 break;
@@ -244,6 +272,7 @@ char *checkNewFiles(char *path, char *oldfiles) {
     DIR *dir = NULL;
     struct dirent *direntp = NULL;
     char *npath;
+    char *temp_file_names;
     char *file_names;
     file_names = malloc (sizeof(file_names) * 1000);
     strcpy(file_names, "");
@@ -265,10 +294,18 @@ char *checkNewFiles(char *path, char *oldfiles) {
 
         switch (direntp->d_type) {
             case DT_REG:
-                if(strstr(oldfiles, direntp->d_name) == NULL) {
+                temp_file_names = malloc(sizeof(temp_file_names)*500);
+                strcpy(temp_file_names, "");
+                strcat(temp_file_names, path);
+                strcat(temp_file_names, "/");
+                strcat(temp_file_names, direntp->d_name);
+                if(strstr(oldfiles, temp_file_names) == NULL) {
                     strcat(file_names, ",");
+                    strcat(file_names, path);
+                    strcat(file_names, "/");
                     strcat(file_names, direntp->d_name);
                 }
+                free(temp_file_names);
                 break;
             case DT_DIR:            
                 npath=malloc(strlen(path)+strlen(direntp->d_name)+2);
