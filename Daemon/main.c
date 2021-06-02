@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <dirent.h>
+#include <pwd.h>
 
 struct audio {
     char types[100];
@@ -36,9 +37,11 @@ static void daemon_process();
 void removeChars(char *s, char c);
 int countFiles(char *path);
 int countSymbols(char *p);
+int movingFiles(char *files, struct config config, char *owner);
 char *checkFiles(char *path);
-char *checkNewFile(char *path, char *oldfiles);
+char *checkNewFiles(char *path, char *oldfiles);
 char *get_filename_ext(char *filename);
+int check_extensions(char *types, char *extension);
 struct config read_config();
 
 int main(int argc, char* argv[])
@@ -52,6 +55,20 @@ int main(int argc, char* argv[])
     char log_file[14]; 
     char *first_files = malloc (sizeof(first_files) * 500);
     char *new_files = malloc (sizeof(first_files) * 500);
+    char owner[20]; 
+    config = read_config();
+
+    find_owner();
+
+    struct passwd* pw;
+
+    if( ( pw = getpwuid( getuid() ) ) == NULL ) {
+       fprintf( stderr,
+          "getpwuid: no password entry\n" );
+       return( EXIT_FAILURE );
+    }
+    strcpy(owner, pw->pw_name);
+
 
     strcpy(log_file, "DaemonLog.txt");
     fp = fopen(log_file, "w+");
@@ -59,30 +76,92 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    config = read_config();
-
     file_count = countFiles(config.dir_to_watch);
 
-    first_files = checkFiles(config.dir_to_watch);
+    strcpy(first_files,checkFiles(config.dir_to_watch));
+
     printf("%s \n", first_files);
+
     fprintf(fp, "starting: %d\n", file_count);
+
     while(1) {
         sleep(1);
         new_file_count = countFiles(config.dir_to_watch);
         if (new_file_count != file_count) {
             fprintf(fp, "%d\n", new_file_count);
-            checkNewFile(config.dir_to_watch, first_files);
-
-
-
+            strcpy(new_files,checkNewFiles(config.dir_to_watch, first_files));
+            movingFiles(new_files, config, owner);
 
             file_count = new_file_count;
         }
         fflush(fp);
     }
+    free(new_files);
     free(first_files);
     fclose(fp);
 
+}
+
+int movingFiles(char *files, struct config config, char *owner) {
+    const char delimiter[2] = ",";
+    char *token;
+    char *extension;
+    char directory[50];
+
+    token = strtok(files, delimiter);
+   
+    while( token != NULL ) {
+        extension = get_filename_ext(token);
+
+        if (check_extensions(config.photo_type.types, extension) == 0 ){
+            printf("FAILAS KELIAMAS\n");
+            sprintf(directory, "/home/%s/Pictures/%s", owner, token);
+            if (rename(token, directory) != 0) {
+                printf("nepavyko :( \n");
+            }
+        }
+        else if (check_extensions(config.video_type.types, extension) == 0){
+            printf("FAILAS KELIAMAS\n");
+            sprintf(directory, "/home/%s/Videos/%s", owner, token);
+            if (rename(token, directory) != 0) {
+                printf("nepavyko :( \n");
+            }
+        }
+        else if (check_extensions(config.document_type.types, extension) == 0){
+            printf("FAILAS KELIAMAS\n");
+            sprintf(directory, "/home/%s/Documents/%s", owner, token);
+            printf("dokumentas: %s\n", directory);
+            if (rename(token, directory) != 0) {
+                perror("Error");
+                printf("nepavyko :( \n");
+            }
+        }
+        else if (check_extensions(config.audio_type.types, extension)==0){
+            printf("FAILAS KELIAMAS\n");
+            sprintf(directory, "/home/%s/Music/%s", owner, token);
+            if (rename(token, directory) != 0) {
+                printf("nepavyko :( \n");
+            }
+        }
+
+    
+        token = strtok(NULL, delimiter);
+   }
+
+}
+
+int check_extensions(char *types, char *extension) {
+    char *token;
+    token = strtok(types, ",");
+   
+    while( token != NULL ) {
+        if (strcmp(token, extension) == 0){
+            return 0;
+        }
+        
+      token = strtok(NULL, ",");
+   }
+    return 1;
 }
 
 int countFiles(char *path) {
@@ -128,7 +207,9 @@ char *checkFiles(char *path) {
     struct dirent *direntp = NULL;
     char *npath;
     char *file_names = malloc (sizeof(file_names) * 500);
+    strcpy(file_names, "");
     
+
     if (!path) { 
         return 0;
     }
@@ -161,12 +242,14 @@ char *checkFiles(char *path) {
     return file_names;
 }
 
-char *checkNewFile(char *path, char *oldfiles) {
+char *checkNewFiles(char *path, char *oldfiles) {
     DIR *dir = NULL;
     struct dirent *direntp = NULL;
     char *npath;
-    char *file_names = malloc (sizeof(file_names) * 500);
-    
+    char *file_names;
+    file_names = malloc (sizeof(file_names) * 1000);
+    strcpy(file_names, "");
+
     if (!path) { 
         return 0;
     }
@@ -184,15 +267,15 @@ char *checkNewFile(char *path, char *oldfiles) {
 
         switch (direntp->d_type) {
             case DT_REG:
-           // printf("bandau\n");
                 if(strstr(oldfiles, direntp->d_name) == NULL) {
-                    printf("naujas: %s\n", direntp->d_name);
+                    strcat(file_names, ",");
+                    strcat(file_names, direntp->d_name);
                 }
                 break;
             case DT_DIR:            
                 npath=malloc(strlen(path)+strlen(direntp->d_name)+2);
                 sprintf(npath,"%s/%s",path, direntp->d_name);
-                checkNewFile(npath, oldfiles);
+                strcat(file_names, checkNewFiles(npath, oldfiles));
                 free(npath);
                 break;
         }
@@ -297,6 +380,8 @@ struct config read_config()
         if (strstr(str, "audio_types =") != NULL) {
             ptr = malloc (sizeof(char) * 100);
             strcpy(ptr, strchr(str, '='));
+            removeChars(ptr, ' ');
+            removeChars(ptr, '=');
             removeChars(ptr, '\n');
             strcpy(pradinis.audio_type.types, ptr);
           
@@ -304,18 +389,24 @@ struct config read_config()
         else if (strstr(str, "video_types =") != NULL) {
             ptr = malloc (sizeof(char) * 100);
             strcpy(ptr, strchr(str, '='));
+            removeChars(ptr, ' ');
+            removeChars(ptr, '=');
             removeChars(ptr, '\n');
             strcpy(pradinis.video_type.types, ptr);
         }
         else if (strstr(str, "document_types =") != NULL) {
             ptr = malloc (sizeof(char) * 100);
             strcpy(ptr, strchr(str, '='));
+            removeChars(ptr, ' ');
+            removeChars(ptr, '=');
             removeChars(ptr, '\n');
             strcpy(pradinis.document_type.types, ptr);
         }
         else if (strstr(str, "photo_types =") != NULL) {
             ptr = malloc (sizeof(char) * 100);
             strcpy(ptr, strchr(str, '='));
+            removeChars(ptr, ' ');
+            removeChars(ptr, '=');
             removeChars(ptr, '\n');
             strcpy(pradinis.photo_type.types, ptr);
         }
