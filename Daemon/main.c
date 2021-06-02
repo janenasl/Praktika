@@ -44,11 +44,11 @@ char *get_filename_ext(char *filename);
 int check_extensions(char *types, char *extension);
 char *find_file_name(char *str);
 int check_if_dir_exists(char *dir);
+int logs(char * text);
 struct config read_config();
 
 int main(int argc, char* argv[])
 {
-   // daemon_process();
     struct config config;
     struct passwd* pw;
     FILE *fp = NULL;
@@ -61,6 +61,7 @@ int main(int argc, char* argv[])
     char owner[20]; 
 
     config = read_config();
+    //daemon_process();
 
     if( ( pw = getpwuid( getuid() ) ) == NULL ) {
        fprintf( stderr,
@@ -69,29 +70,32 @@ int main(int argc, char* argv[])
     }
     strcpy(owner, pw->pw_name);
 
-
     strcpy(log_file, "DaemonLog.txt");
-    fp = fopen(log_file, "w+");
+    fp = fopen(log_file, "a");
     if (fp == NULL) {
+        logs("Can't open DaemonLog.txt");
         return 0;
     }
+    fprintf(fp, "[%s %s] -------------------\n" ,__DATE__, __TIME__ );
+    fprintf(fp, "[%s %s] program owner: %s\n", __DATE__, __TIME__, owner);
 
     file_count = countFiles(config.dir_to_watch);
-
     strcpy(first_files,checkFiles(config.dir_to_watch));
+    logs("aaaa");
 
-    fprintf(fp, "starting: %d\n", file_count);
+    fprintf(fp, "[%s %s] starting with %d files\n", __DATE__, __TIME__, file_count);
 
     while(1) {
         sleep(1);
         new_file_count = countFiles(config.dir_to_watch);
         if (new_file_count != file_count) {
-            fprintf(fp, "%d\n", new_file_count);
+            fprintf(fp, "[%s %s] file change occured, new file count: %d\n", __DATE__, __TIME__,new_file_count);
+            fflush(fp);
             strcpy(new_files,checkNewFiles(config.dir_to_watch, first_files));
+            printf("nauji: %s \n", new_files);
             movingFiles(new_files, config, owner);
             file_count = new_file_count;
         }
-        fflush(fp);
     }
     free(new_files);
     free(first_files);
@@ -100,6 +104,16 @@ int main(int argc, char* argv[])
 }
 
 int movingFiles(char *files, struct config config, char *owner) {
+    FILE *fp = NULL;
+    char log_file[14];
+    strcpy(log_file, "DaemonLog.txt");
+
+    fp = fopen(log_file, "a");
+    if (fp == NULL) {
+        logs("Can't open DaemonLog.txt");
+        return 0;
+    }
+    printf("failai metode: %s \n", files);
     const char delimiter[2] = ",";
     char *token;
     char *extension;
@@ -111,44 +125,64 @@ int movingFiles(char *files, struct config config, char *owner) {
     token = strtok(files, delimiter);
    
     while( token != NULL ) {
-        printf("tokenas: %s \n", token);
         extension = get_filename_ext(token);
         strcpy(file_name, find_file_name(token));
-        if (check_extensions(config.photo_type.types, extension) == 0 ){
-            printf("FAILAS KELIAMAS\n");
+        fprintf(fp, "[%s %s] New file found: %s\n", __DATE__, __TIME__, token);
+        printf("tokenai: %s\n", token);
+        if (check_extensions(config.photo_type.types, extension) == 0 && config.photo_type.monitor == 1){
             sprintf(directory, "/home/%s/Pictures/", owner);
-            check_if_dir_exists("/home/ragaaaas");
+            check_if_dir_exists(directory);
+            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
             sprintf(directory, "/home/%s/Pictures/%s", owner, file_name);
             if (rename(token, directory) != 0) {
-                printf("nepavyko :( \n");
+                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
+            }
+            else {
+                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
             }
         }
-        else if (check_extensions(config.video_type.types, extension) == 0){
-            printf("FAILAS KELIAMAS\n");
+        else if (check_extensions(config.video_type.types, extension) == 0 && config.video_type.monitor == 1){
+            sprintf(directory, "/home/%s/Videos/", owner);
+            check_if_dir_exists(directory);
+            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
             sprintf(directory, "/home/%s/Videos/%s", owner, file_name);
             if (rename(token, directory) != 0) {
-                printf("nepavyko :( \n");
+                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
+            }
+            else {
+                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
             }
         }
-        else if (check_extensions(config.document_type.types, extension) == 0){
-            printf("FAILAS KELIAMAS\n");
+        else if (check_extensions(config.document_type.types, extension) == 0 && config.document_type.monitor == 1){
+            sprintf(directory, "/home/%s/Documents/", owner);
+            check_if_dir_exists(directory);
+            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
             sprintf(directory, "/home/%s/Documents/%s", owner, file_name);
-            printf("dokumentas: %s\n", directory);
-            printf("tokenas: %s\n", token);
             if (rename(token, directory) != 0) {
-                perror("Error");
-                printf("nepavyko :( \n");
+                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
+            }
+            else {
+                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
             }
         }
-        else if (check_extensions(config.audio_type.types, extension)==0){
-            printf("FAILAS KELIAMAS\n");
+        else if (check_extensions(config.audio_type.types, extension)==0 && config.audio_type.monitor == 1){
+            sprintf(directory, "/home/%s/Music/", owner);
+            check_if_dir_exists(directory);
+            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
             sprintf(directory, "/home/%s/Music/%s", owner, file_name);
             if (rename(token, directory) != 0) {
-                printf("nepavyko :( \n");
+                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
             }
+            else {
+                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
+            }
+        }
+        else {
+            fprintf(fp, "[%s %s] file %s was not moved, because its monitoring is turned off\n", __DATE__, __TIME__, token);
         }
         token = strtok(NULL, delimiter);
    }
+   fflush(fp);
 }
 
 int check_if_dir_exists(char *dir) {
@@ -157,27 +191,30 @@ int check_if_dir_exists(char *dir) {
 
     // If file does not exists 
     if (fptr == NULL){
-        mkdir(dir, 0777);
-        printf("CREATED\n");
+        printf("mes esame čia\n");
+        if (mkdir(dir, 0777) == 0) {
+        logs("directory to move file was not found, therefore created");
         return 0;
+        }
+        logs("directory to move file was not found and creating it failed");
+        return 1;
     }
     
     return 0;
 }
 
 char *find_file_name(char *str) {
-        char *file_name = strrchr(str, '/');
+    char *file_name = strrchr(str, '/');
     if(!file_name || file_name == str) {
         return "";
     }
-    printf("failo vardas: %s\n", file_name);
     return file_name + 1;
 }
 
 int check_extensions(char *types, char *extension) {
     char *token;
     token = strtok(types, ",");
-   
+    
     while( token != NULL ) {
         if (strcmp(token, extension) == 0){
             return 0;
@@ -300,10 +337,10 @@ char *checkNewFiles(char *path, char *oldfiles) {
                 strcat(temp_file_names, "/");
                 strcat(temp_file_names, direntp->d_name);
                 if(strstr(oldfiles, temp_file_names) == NULL) {
-                    strcat(file_names, ",");
                     strcat(file_names, path);
                     strcat(file_names, "/");
                     strcat(file_names, direntp->d_name);
+                    strcat(file_names, ",");
                 }
                 free(temp_file_names);
                 break;
@@ -326,12 +363,28 @@ int countSymbols(char *p)
 	char c;
 	
 	if ((fp = fopen(p, "r")) == NULL) {
-        perror(p);
+        logs("Can't open file when counting symbols!\n");
     }
 	for (c = getc(fp); c != EOF; c = getc(fp)) {
         count = count + 1; 
 	}
 	return count;
+}
+int logs(char *text) {
+    FILE *fp = NULL;
+    char log_file[14]; 
+
+    strcpy(log_file, "DaemonLog.txt");
+    fp = fopen(log_file, "a");
+    if (fp == NULL) {
+        return 0;
+    }
+
+    fprintf(fp, "[%s %s] %s\n", __DATE__, __TIME__, text);
+
+    fflush(fp);
+
+    return 0;
 }
 
 void removeChars(char *s, char c)
@@ -409,6 +462,7 @@ struct config read_config()
 	Symbols = countSymbols("config.cfg");
 	char str[Symbols];
     if ((fp = fopen("config.cfg", "r")) == NULL) {
+        logs("Can't find config file!");
         exit(1);
     }
 	while (fgets(str, Symbols, fp) != NULL) {   
@@ -475,7 +529,8 @@ struct config read_config()
         free(ptr);
 	    rv = fclose( fp );
 	    if( rv != 0 ) {
-         exit(0);
+            logs("Closing config file failed!");
+            exit(1);
         }
         return (pradinis);
 }
