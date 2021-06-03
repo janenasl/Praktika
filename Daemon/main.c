@@ -7,6 +7,8 @@
 #include <dirent.h>
 #include <pwd.h>
 
+#define LOGVALUE 14
+
 struct audio {
     char types[100];
     int monitor;
@@ -37,14 +39,16 @@ static void daemon_process();
 void removeChars(char *s, char c);
 int countFiles(char *path);
 int countSymbols(char *p);
-int movingFiles(char *files, struct config config, char *owner);
+int checkingFileMove(char *files, struct config config, char *owner);
 char *checkFiles(char *path);
 char *checkNewFiles(char *path, char *oldfiles);
 char *get_filename_ext(char *filename);
 int check_extensions(char *types, char *extension);
 char *find_file_name(char *str);
 int check_if_dir_exists(char *dir);
-int logs(char * text);
+int movingFiles(char *directory, char *owner, char *file_name, char *token, char *sprintf_text);
+struct config configuration(char *str, struct config config, char *type);
+int logs(char *text);
 struct config read_config();
 
 int main(int argc, char* argv[])
@@ -55,13 +59,13 @@ int main(int argc, char* argv[])
 
     int file_count = 0;
     int new_file_count = 0;
-    char log_file[14]; 
+    char log_file[LOGVALUE]; 
     char *first_files = malloc (sizeof(first_files) * 1000);
     char *new_files = malloc (sizeof(first_files) * 1000);
-    char owner[20]; 
+    char owner[20];
 
     config = read_config();
-    //daemon_process();
+    daemon_process();
 
     if( ( pw = getpwuid( getuid() ) ) == NULL ) {
        fprintf( stderr,
@@ -81,7 +85,6 @@ int main(int argc, char* argv[])
 
     file_count = countFiles(config.dir_to_watch);
     strcpy(first_files,checkFiles(config.dir_to_watch));
-    logs("aaaa");
 
     fprintf(fp, "[%s %s] starting with %d files\n", __DATE__, __TIME__, file_count);
 
@@ -92,8 +95,8 @@ int main(int argc, char* argv[])
             fprintf(fp, "[%s %s] file change occured, new file count: %d\n", __DATE__, __TIME__,new_file_count);
             fflush(fp);
             strcpy(new_files,checkNewFiles(config.dir_to_watch, first_files));
-            printf("nauji: %s \n", new_files);
-            movingFiles(new_files, config, owner);
+            checkingFileMove(new_files, config, owner);
+            strcpy(first_files,checkFiles(config.dir_to_watch));
             file_count = new_file_count;
         }
     }
@@ -103,9 +106,9 @@ int main(int argc, char* argv[])
 
 }
 
-int movingFiles(char *files, struct config config, char *owner) {
+int movingFiles(char *directory, char *owner, char *file_name, char *token, char *sprintf_text) {
     FILE *fp = NULL;
-    char log_file[14];
+    char log_file[LOGVALUE];
     strcpy(log_file, "DaemonLog.txt");
 
     fp = fopen(log_file, "a");
@@ -113,7 +116,29 @@ int movingFiles(char *files, struct config config, char *owner) {
         logs("Can't open DaemonLog.txt");
         return 0;
     }
-    printf("failai metode: %s \n", files);
+    
+    sprintf(directory, "/home/%s/%s/", owner, sprintf_text);
+    check_if_dir_exists(directory);
+    fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
+    sprintf(directory, "/home/%s/%s/%s", owner, sprintf_text, file_name);
+    if (rename(token, directory) != 0) {
+        fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
+    } else {
+        fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
+    }
+    return 0;
+}
+
+int checkingFileMove(char *files, struct config config, char *owner) {
+    FILE *fp = NULL;
+    char log_file[LOGVALUE];
+    strcpy(log_file, "DaemonLog.txt");
+
+    fp = fopen(log_file, "a");
+    if (fp == NULL) {
+        logs("Can't open DaemonLog.txt");
+        return 0;
+    }
     const char delimiter[2] = ",";
     char *token;
     char *extension;
@@ -128,104 +153,60 @@ int movingFiles(char *files, struct config config, char *owner) {
         extension = get_filename_ext(token);
         strcpy(file_name, find_file_name(token));
         fprintf(fp, "[%s %s] New file found: %s\n", __DATE__, __TIME__, token);
-        printf("tokenai: %s\n", token);
         if (check_extensions(config.photo_type.types, extension) == 0 && config.photo_type.monitor == 1){
-            sprintf(directory, "/home/%s/Pictures/", owner);
-            check_if_dir_exists(directory);
-            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
-            sprintf(directory, "/home/%s/Pictures/%s", owner, file_name);
-            if (rename(token, directory) != 0) {
-                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
-            }
-            else {
-                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
-            }
-        }
-        else if (check_extensions(config.video_type.types, extension) == 0 && config.video_type.monitor == 1){
-            sprintf(directory, "/home/%s/Videos/", owner);
-            check_if_dir_exists(directory);
-            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
-            sprintf(directory, "/home/%s/Videos/%s", owner, file_name);
-            if (rename(token, directory) != 0) {
-                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
-            }
-            else {
-                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
-            }
-        }
-        else if (check_extensions(config.document_type.types, extension) == 0 && config.document_type.monitor == 1){
-            sprintf(directory, "/home/%s/Documents/", owner);
-            check_if_dir_exists(directory);
-            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
-            sprintf(directory, "/home/%s/Documents/%s", owner, file_name);
-            if (rename(token, directory) != 0) {
-                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
-            }
-            else {
-                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
-            }
-        }
-        else if (check_extensions(config.audio_type.types, extension)==0 && config.audio_type.monitor == 1){
-            sprintf(directory, "/home/%s/Music/", owner);
-            check_if_dir_exists(directory);
-            fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
-            sprintf(directory, "/home/%s/Music/%s", owner, file_name);
-            if (rename(token, directory) != 0) {
-                fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, token);
-            }
-            else {
-                fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
-            }
-        }
-        else {
-            fprintf(fp, "[%s %s] file %s was not moved, because its monitoring is turned off\n", __DATE__, __TIME__, token);
+                movingFiles(directory, owner, file_name, token, "Pictures");
+        } else if (check_extensions(config.video_type.types, extension) == 0 && config.video_type.monitor == 1){
+                movingFiles(directory, owner, file_name, token, "Videos");
+        } else if (check_extensions(config.document_type.types, extension) == 0 && config.document_type.monitor == 1){
+                movingFiles(directory, owner, file_name, token, "Documents");
+        } else if (check_extensions(config.audio_type.types, extension)==0 && config.audio_type.monitor == 1){
+                movingFiles(directory, owner, file_name, token, "Music");
+        } else {
+                fprintf(fp, "[%s %s] file %s was not moved, because its monitoring is turned off\n", __DATE__, __TIME__, token);
         }
         token = strtok(NULL, delimiter);
    }
    fflush(fp);
 }
 
-int check_if_dir_exists(char *dir) {
-
+int check_if_dir_exists(char *dir) 
+{
     FILE *fptr = fopen(dir, "r");
-
-    // If file does not exists 
     if (fptr == NULL){
-        printf("mes esame čia\n");
-        if (mkdir(dir, 0777) == 0) {
-        logs("directory to move file was not found, therefore created");
-        return 0;
-        }
-        logs("directory to move file was not found and creating it failed");
-        return 1;
+            if (mkdir(dir, 0777) == 0) {
+                    logs("directory to move file was not found, therefore created");
+                    return 0;
+            }       
+            logs("directory to move file was not found and creating it failed");
+            return 1;
     }
-    
     return 0;
 }
 
-char *find_file_name(char *str) {
+char *find_file_name(char *str)
+{
+
     char *file_name = strrchr(str, '/');
     if(!file_name || file_name == str) {
-        return "";
+            return "";
     }
     return file_name + 1;
 }
 
-int check_extensions(char *types, char *extension) {
+int check_extensions(char *types, char *extension) 
+{
     char *token;
-    token = strtok(types, ",");
-    
-    while( token != NULL ) {
-        if (strcmp(token, extension) == 0){
+    char *rest = types;
+    while ((token = strtok_r(types, ",", &types))) {
+        if (strcmp(token, extension) == 0) {
             return 0;
         }
-        
-      token = strtok(NULL, ",");
-   }
+    }
     return 1;
 }
 
-int countFiles(char *path) {
+int countFiles(char *path) 
+{
     DIR *dir = NULL;
     struct dirent *direntp = NULL;
     char *npath;
@@ -263,7 +244,8 @@ int countFiles(char *path) {
     return count;
 }
 
-char *checkFiles(char *path) {
+char *checkFiles(char *path) 
+{
     DIR *dir = NULL;
     struct dirent *direntp = NULL;
     char *npath;
@@ -305,7 +287,8 @@ char *checkFiles(char *path) {
     return file_names;
 }
 
-char *checkNewFiles(char *path, char *oldfiles) {
+char *checkNewFiles(char *path, char *oldfiles) 
+{
     DIR *dir = NULL;
     struct dirent *direntp = NULL;
     char *npath;
@@ -370,20 +353,20 @@ int countSymbols(char *p)
 	}
 	return count;
 }
-int logs(char *text) {
-    FILE *fp = NULL;
-    char log_file[14]; 
 
-    strcpy(log_file, "DaemonLog.txt");
-    fp = fopen(log_file, "a");
+int logs(char *text) 
+{
+    FILE *fp = NULL;
+
+    fp = fopen("DaemonLog.txt", "a");
     if (fp == NULL) {
-        return 0;
+            fprintf(fp, "[%s %s] Can't open DaemonLog.txt\n", __DATE__, __TIME__);
+            return 1;
     }
 
     fprintf(fp, "[%s %s] %s\n", __DATE__, __TIME__, text);
 
     fflush(fp);
-
     return 0;
 }
 
@@ -404,7 +387,8 @@ void removeChars(char *s, char c)
     s[writer]=0;
 }
 
-char *get_filename_ext(char *filename) {
+char *get_filename_ext(char *filename) 
+{
     char *extension = strrchr(filename, '.');
     if(!extension || extension == filename) {
         return "";
@@ -446,6 +430,25 @@ static void daemon_process()
     // close(STDERR_FILENO);
 }
 
+struct config configuration(char *str, struct config config, char *type) {
+    char *ptr;
+    ptr = malloc (sizeof(char) * 100);
+    strcpy(ptr, strchr(str, '='));
+    removeChars(ptr, ' ');
+    removeChars(ptr, '=');
+    removeChars(ptr, '\n');
+    if (strcmp(type, "audio") == 0){
+            strcpy(config.audio_type.types, ptr);
+    } else if (strcmp(type, "video") == 0) {
+            strcpy(config.video_type.types, ptr);
+    } else if (strcmp(type, "document") == 0) {
+            strcpy(config.document_type.types, ptr);
+    } else if (strcmp(type, "photo") == 0) {
+            strcpy(config.photo_type.types, ptr);
+    }
+    return (config);
+}
+
 struct config read_config()
 {
     struct config pradinis; 
@@ -455,8 +458,6 @@ struct config read_config()
     pradinis.photo_type.monitor = 0;
 	int Symbols = 0;
 	FILE *fp;
-	int line = 1;
-    int i = 0;
 	int rv;
     char *ptr;
 	Symbols = countSymbols("config.cfg");
@@ -466,71 +467,45 @@ struct config read_config()
         exit(1);
     }
 	while (fgets(str, Symbols, fp) != NULL) {   
-        if (strstr(str, "audio_types =") != NULL) {
-            ptr = malloc (sizeof(char) * 100);
-            strcpy(ptr, strchr(str, '='));
-            removeChars(ptr, ' ');
-            removeChars(ptr, '=');
-            removeChars(ptr, '\n');
-            strcpy(pradinis.audio_type.types, ptr);
-          
-        }
-        else if (strstr(str, "video_types =") != NULL) {
-            ptr = malloc (sizeof(char) * 100);
-            strcpy(ptr, strchr(str, '='));
-            removeChars(ptr, ' ');
-            removeChars(ptr, '=');
-            removeChars(ptr, '\n');
-            strcpy(pradinis.video_type.types, ptr);
-        }
-        else if (strstr(str, "document_types =") != NULL) {
-            ptr = malloc (sizeof(char) * 100);
-            strcpy(ptr, strchr(str, '='));
-            removeChars(ptr, ' ');
-            removeChars(ptr, '=');
-            removeChars(ptr, '\n');
-            strcpy(pradinis.document_type.types, ptr);
-        }
-        else if (strstr(str, "photo_types =") != NULL) {
-            ptr = malloc (sizeof(char) * 100);
-            strcpy(ptr, strchr(str, '='));
-            removeChars(ptr, ' ');
-            removeChars(ptr, '=');
-            removeChars(ptr, '\n');
-            strcpy(pradinis.photo_type.types, ptr);
-        }
-        else if (strstr(str, "types_to_watch =") != NULL) {
-            strcpy(ptr, strchr(str, '='));
-           strcpy(pradinis.types_to_watch, ptr);
-           if ((strstr(ptr, "audio") != NULL )) {
-                 pradinis.audio_type.monitor = 1;
-           }
-            if ((strstr(ptr, "video") != NULL )) {
-                pradinis.video_type.monitor = 1;
-           }
-            if ((strstr(ptr, "document") != NULL )) {
-                pradinis.document_type.monitor = 1;
-           }
-            if ((strstr(ptr, "photo") != NULL )) {
-                pradinis.photo_type.monitor = 1;
-           }
+            if (strstr(str, "audio_types =") != NULL) {
+                    pradinis = configuration(str, pradinis, "audio");
+            } else if (strstr(str, "video_types =") != NULL) {
+                    pradinis = configuration(str, pradinis, "video");
+            } else if (strstr(str, "document_types =") != NULL) {
+                    pradinis = configuration(str, pradinis, "document");
+            } else if (strstr(str, "photo_types =") != NULL) {
+                    pradinis = configuration(str, pradinis, "photo");
+            } else if (strstr(str, "types_to_watch =") != NULL) {
+                    strcpy(ptr, strchr(str, '='));
+                    strcpy(pradinis.types_to_watch, ptr);
+                    if ((strstr(ptr, "audio") != NULL )) {
+                            pradinis.audio_type.monitor = 1;
+                    }
+                    if ((strstr(ptr, "video") != NULL )) {
+                            pradinis.video_type.monitor = 1;
+                    }
+                    if ((strstr(ptr, "document") != NULL )) {
+                            pradinis.document_type.monitor = 1;
+                    }
+                    if ((strstr(ptr, "photo") != NULL )) {
+                            pradinis.photo_type.monitor = 1;
+                    }
 
-        }
-        else if (strstr(str, "dir_to_watch =") != NULL) {
-            ptr = malloc (sizeof(char) * 100);
-            strcpy(ptr, strchr(str, '='));
-            removeChars(ptr, ' ');
-            removeChars(ptr, '=');
-            removeChars(ptr, '\n');
-            strcpy(pradinis.dir_to_watch, ptr);
-        }
-        line++;
+            } else if (strstr(str, "dir_to_watch =") != NULL) {
+                        ptr = malloc (sizeof(char) * 100);
+                        strcpy(ptr, strchr(str, '='));
+                        removeChars(ptr, ' ');
+                        removeChars(ptr, '=');
+                        removeChars(ptr, '\n');
+                        strcpy(pradinis.dir_to_watch, ptr);
+            }
     }
-        free(ptr);
-	    rv = fclose( fp );
-	    if( rv != 0 ) {
-            logs("Closing config file failed!");
-            exit(1);
-        }
-        return (pradinis);
+
+    free(ptr);
+    rv = fclose(fp);
+    if( rv != 0 ) {
+        logs("Closing config file failed!");
+        exit(1);
+    }
+    return (pradinis);
 }
