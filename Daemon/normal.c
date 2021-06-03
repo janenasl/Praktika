@@ -55,9 +55,9 @@ int main(int argc, char* argv[])
     printf("file: %d\n", file_count);
 
     char **str = takeList(length());
-    printf("gaunu: %s\n", str[0]);
-    //printList();
+    printf("gaunu: %s\n", str[12]);
     
+    //printList();
     //daemon_process();
 }
 

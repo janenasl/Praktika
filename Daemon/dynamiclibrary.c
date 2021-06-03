@@ -34,15 +34,16 @@ void printList()
 
 char **takeList(int length) 
 {
-    char ** sub_str = malloc(10 * sizeof(char*));
+    char ** sub_str = malloc(300 * sizeof(char*));
     int i = 0;
     for (int i =0 ; i < length; i++) {
-        sub_str[i] = malloc(20 * sizeof(char));
+        sub_str[i] = malloc(300 * sizeof(char));
     }
     
     struct Node *ptr = head;
+    i = 0;
     while(ptr != NULL) {
-        strcpy(sub_str[i], ptr->data);
+        strcpy(sub_str[i++], ptr->data);
         ptr = ptr->next;
     }
     return sub_str;
