@@ -34,7 +34,7 @@ void printList()
 
 char **takeList(int length) 
 {
-    char ** sub_str = malloc(100 * sizeof(char**));
+    char ** sub_str = malloc(length * sizeof(char**));
     int i = 0;
     for (int i =0 ; i < length; i++) {
         sub_str[i] = malloc(500 * sizeof(char));
