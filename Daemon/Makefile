@@ -1,12 +1,21 @@
-CC=gcc
-LD_LIBRARY=$(shell pwd)
-FLAGS=-g -D_DEFAULT_SOURCE -Wall -Werror -pedantic
-OBJ=normal.c
+CC:=gcc
+CFLAGS:=-Wall -Werror -pedantic
+CURDIR:=$(shell pwd)
+EXTRAFLAGS:=-shared -fpic
+BIN:=mover
+LIB:=libdynamic.so
+PREFIX ?= /usr
+LDFLAGS:=-L$(CURDIR)
 
-Programs: libdynamic.so telt
+.phony = all clean
 
-telt: $(OBJ)
-	$(CC) $(FLAGS) -o main normal.c -L$(LD_LIBRARY) -ldynamic -Wl,-rpath=$(LD_LIBRARY)
+all: $(LIB) $(BIN)
 
-libdynamic.so: ./dynamiclibrary.c ./dynamiclibrary.h
-	$(CC) -Wall -shared -fPIC -o libdynamic.so ./dynamiclibrary.c
+$(LIB): ./lib/dynamiclibrary.c
+		$(CC) $(CFLAGS) $(EXTRAFLAGS) -o $@ $<
+
+$(BIN): main.c
+		$(CC) -g -D_DEFAULT_SOURCE $(CFLAGS) -o $@ $< $(LDFLAGS) -ldynamic  -Wl,-rpath=$(CURDIR)
+
+clean:
+		$(RM) $(BIN) $(LIB)
