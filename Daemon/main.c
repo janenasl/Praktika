@@ -1,119 +1,123 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <dirent.h>
 #include <pwd.h>
-#include <limits.h>
 #include <errno.h>
 
-#include "lib/dynamiclibrary.h"
 #include "functions.h"
+#include "LinkedList.h"
+#include "files.h"
 
-FILE *fp;
+#define CONFIGFILE "/etc/DaemonConfig.conf"
+#define LOGFILE "/var/log/DaemonLog.txt"
 
 int main(int argc, char* argv[])
 {
     struct config config;
-    char **old_files; 
-    char **new_files;
-    int file_count = 0;
-    int new_file_count = 0;
-    int old_files_count = 0;
+    open_file();
 
-    fp = fopen("/var/log/DaemonLog.txt", "a");
-    if (fp == NULL) {
-            printf("Can't open log file, program will be terminated. Try with again with root privilegies! \n");
-            exit(1);
-    }
-
-    fprintf(fp, "[%s %s] -------------------\n" ,__DATE__, __TIME__ );
-    fprintf(fp, "[%s %s] program owner: %s\n", __DATE__, __TIME__, findOwner());
+    fprintf(fp, "[%s %s] --------- PROGRAM STARTED ----------\n", __DATE__, __TIME__ );
     fflush(fp);
 
     config = read_config();
     daemon_process();
+    main_process(config);
+}
 
-    file_count = countFiles(config.dir_to_watch);
-    checkFiles(config.dir_to_watch);
-    old_files = takeList(length());
-    old_files_count = length();
-    deleteList();
+void main_process(struct config config)
+{
+    char **not_movable; 
+    char **new_files;
+    int file_count = 0;
+    int new_file_count = 0;
+    int not_movable_count = 0;
+
+    open_file();
+
+    file_count = count_files(config.dir_to_watch);
+    save_not_movable_files(config.dir_to_watch);
+    not_movable = take_list(length());
+    not_movable_count = length();
+    delete_list();
 
     while(1) {
             sleep(1);
-            new_file_count = countFiles(config.dir_to_watch);
+            new_file_count = count_files(config.dir_to_watch);
             if (new_file_count != file_count) {
-                    checkNewFiles(config.dir_to_watch, old_files, old_files_count);
-                    new_files = takeList(length());
-                    checkingFileMove(new_files, config, length());
-                    deleteList();
-                    checkFiles(config.dir_to_watch);
-                    old_files = takeList(length());
-                    old_files_count = length();
-                    deleteList();
+                    check_new_files(config.dir_to_watch, not_movable, not_movable_count);
+                    new_files = take_list(length());
+                    check_if_file_move(new_files, config, length());
+                    delete_list();
+                    save_not_movable_files(config.dir_to_watch);
+                    not_movable = take_list(length());
+                    not_movable_count = length();
+                    delete_list();
+
                     file_count = new_file_count;
-        }
+            }
     }
 
-    deleteList();
+    delete_list();
 
     if (fclose(fp) != 0) {
             fprintf(fp, "[%s %s] closing file failed!\n", __DATE__, __TIME__);
     }
+
 }
 
-int checkingFileMove(char **files, struct config config, int file_count)
+void open_file() 
 {
-    char extension[100];
-    char file_name[100];
-
-    fp = fopen("/var/log/DaemonLog.txt", "a");
+    fp = fopen(LOGFILE, "a");
     if (fp == NULL) {
             printf("Can't open log file, program will be terminated! \n");
             exit(1);
     }
+}
+
+void check_if_file_move(char **files, struct config config, int file_count)
+{
+    char extension[100];
+    char file_name[100];
 
     for(int i = 0; i < file_count; i++){
             fprintf(fp, "[%s %s] New file found: %s\n", __DATE__, __TIME__, files[i]);
             strcpy(extension, get_filename_ext(files[i]));
-            strcpy(file_name, find_file_name(files[i]));
+            strcpy(file_name, get_file_name(files[i]));
             if (check_extensions(config.photo_type.types, extension) == 0 && config.photo_type.monitor == 1){
-                    movingFiles(files[i], file_name, "Pictures");
+                    move_files(files[i], file_name, "Pictures");
             } else if (check_extensions(config.document_type.types, extension) == 0 && config.document_type.monitor == 1) {
-                    movingFiles(files[i], file_name, "Documents");
+                    move_files(files[i], file_name, "Documents");
             } else if (check_extensions(config.video_type.types, extension) == 0 && config.video_type.monitor == 1) {
-                    movingFiles(files[i], file_name, "Videos");
+                    move_files(files[i], file_name, "Videos");
             } else if (check_extensions(config.audio_type.types, extension) == 0 && config.audio_type.monitor == 1) {
-                    movingFiles(files[i], file_name, "Music");
+                    move_files(files[i], file_name, "Music");
             } else {
                   fprintf(fp, "[%s %s] file %s was not moved, because this type of file (.%s) is not monitored\n", __DATE__, __TIME__, files[i], extension);
             }
     }
     fflush(fp);
-    return 0;
 }
 
 
 
-int movingFiles(char *file_full_path, char *file_name, char *sprintf_text)
+void move_files(char *file_full_path, char *file_name, char *sprintf_text)
 {
     char directory[200];
-    sprintf(directory, "/home/%s/%s/", findOwner(), sprintf_text);
+    sprintf(directory, "/home/%s/%s/", find_owner(), sprintf_text);
     check_if_dir_exists(directory);
     fprintf(fp, "[%s %s] trying to move to: %s\n", __DATE__, __TIME__, directory);
-    sprintf(directory, "/home/%s/%s/%s", findOwner(), sprintf_text, file_name);
+    sprintf(directory, "/home/%s/%s/%s", find_owner(), sprintf_text, file_name);
     if (rename(file_full_path, directory) != 0) {
         fprintf(fp, "[%s %s] file %s was not moved (bad path)\n", __DATE__, __TIME__, file_full_path);
     } else {
         fprintf(fp, "[%s %s] file moved to: %s\n", __DATE__, __TIME__, directory);
     }
-    return 0;
 }
 
-char *find_file_name(char *str)
+char *get_file_name(char *str)
 {
     char *file_name = strrchr(str, '/');
     if(!file_name || file_name == str) {
@@ -149,7 +153,7 @@ int check_if_dir_exists(char *dir)
             if (mkdir_p(dir) == 0) {
                     fprintf(fp, "[%s %s] directory to move file was not found, therefore created\n", __DATE__, __TIME__);
                     return 0;
-            }       
+            }    
             fprintf(fp, "[%s %s] directory to move file was not found and creating it failed\n", __DATE__, __TIME__);
             exit(1);
     }
@@ -157,159 +161,164 @@ int check_if_dir_exists(char *dir)
 }
 
 
-char *findOwner()
+char *find_owner()
 {
     struct passwd* pw;
-    char owner[50];
-    char *s_owner = owner;
+    char *owner = NULL;
 
-    if( ( pw = getpwuid( getuid() ) ) == NULL ) {
-       fprintf( fp,
-          "getpwuid: no password entry\n" );
-          exit(1);
+    if((pw = getpwuid(getuid())) == NULL) {
+            fprintf( fp, "[%s %s] getpwuid: no password entry\n", __DATE__, __TIME__);
+            exit(1);
     }
-    strcpy(s_owner, pw->pw_name);
-    return s_owner;
+
+    owner = (char *) malloc(sizeof(char) * strlen(pw->pw_name)+1);
+
+    if (owner == NULL) {
+        return NULL;
+    }
+
+    strcpy(owner, pw->pw_name);
+    return owner;
 }
 
-int checkFiles(char *path)
-{
-    DIR *dir = NULL;
-    struct dirent *direntp = NULL;
+// int check_not_movable_files(char *path)
+// {
+//     DIR *dir = NULL;
+//     struct dirent *direntp = NULL;
 
-    char *npath;
-    char *temp_path;
+//     char *npath;
+//     char *temp_path;
 
-    if (!path) {
-            fprintf(fp, "[%s %s] given path is null", __DATE__, __TIME__);
-            exit(1);
-    }
+//     if (!path) {
+//             fprintf(fp, "[%s %s] given path is null", __DATE__, __TIME__);
+//             exit(1);
+//     }
 
-    dir = opendir(path);
+//     dir = opendir(path);
 
-    if (dir == NULL ) { 
-            fprintf(fp, "[%s %s] directory %s does not exist", __DATE__, __TIME__, path);
-            fflush(fp);
-            exit(1);
-    }
+//     if (dir == NULL ) { 
+//             fprintf(fp, "[%s %s] directory %s does not exist", __DATE__, __TIME__, path);
+//             fflush(fp);
+//             exit(1);
+//     }
 
-    while( (direntp = readdir(dir))) {
-            if (strcmp(direntp->d_name,".") == 0 || strcmp(direntp->d_name,"..") == 0) {
-                    continue;
-            }
+//     while( (direntp = readdir(dir))) {
+//             if (strcmp(direntp->d_name,".") == 0 || strcmp(direntp->d_name,"..") == 0) {
+//                     continue;
+//             }
 
-            switch (direntp->d_type) {
-                    case DT_REG:
-                            temp_path = malloc(strlen(path)+strlen(direntp->d_name)+2);
-                            sprintf(temp_path, "%s/%s", path, direntp->d_name);
-                            push(temp_path);
-                            break;
-                    case DT_DIR:            
-                            npath=malloc(strlen(path)+strlen(direntp->d_name)+2);
-                            sprintf(npath,"%s/%s",path, direntp->d_name);
-                            checkFiles(npath);
-                            free(npath);
-                            break;
-            }
-    }
-    closedir(dir);
-    return 0;
-}
+//             switch (direntp->d_type) {
+//                     case DT_REG:
+//                             temp_path = malloc(strlen(path)+strlen(direntp->d_name)+2);
+//                             sprintf(temp_path, "%s/%s", path, direntp->d_name);
+//                             push(temp_path);
+//                             break;
+//                     case DT_DIR:            
+//                             npath=(char *) malloc(sizeof(char) * (strlen(path)+strlen(direntp->d_name)+2));
+//                             sprintf(npath,"%s/%s",path, direntp->d_name);
+//                             check_not_movable_files(npath);
+//                             free(npath);
+//                             break;
+//             }
+//     }
+//     closedir(dir);
+//     return 0;
+// }
 
-int checkNewFiles(char *path, char **oldfiles, int file_count)
-{
-    DIR *dir = NULL;
-    struct dirent *direntp = NULL;
+// int check_new_files(char *path, char **oldfiles, int file_count)
+// {
+//     DIR *dir = NULL;
+//     struct dirent *direntp = NULL;
 
-    char *npath;
-    char *temp_path;
-    int checking = 0;
+//     char *npath;
+//     char *temp_path;
+//     int checking = 0;
 
-    if (!path) {
-            fprintf(fp, "[%s %s] given path is null", __DATE__, __TIME__);
-            exit(1);
-    }
+//     if (!path) {
+//             fprintf(fp, "[%s %s] given path is null", __DATE__, __TIME__);
+//             exit(1);
+//     }
 
-    dir = opendir(path);
+//     dir = opendir(path);
 
-    if (dir == NULL ) { 
-            fprintf(fp, "[%s %s] directory %s does not exist", __DATE__, __TIME__, path);
-            fflush(fp);
-            exit(1);
-    }
+//     if (dir == NULL ) { 
+//             fprintf(fp, "[%s %s] directory %s does not exist", __DATE__, __TIME__, path);
+//             fflush(fp);
+//             exit(1);
+//     }
 
-    while( (direntp = readdir(dir))) {
-        if (strcmp(direntp->d_name,".") == 0 || strcmp(direntp->d_name,"..") == 0) {
-                continue;
-        }
+//     while( (direntp = readdir(dir))) {
+//         if (strcmp(direntp->d_name,".") == 0 || strcmp(direntp->d_name,"..") == 0) {
+//                 continue;
+//         }
 
-        switch (direntp->d_type) {
-                case DT_REG:
-                        checking = 0;
-                        temp_path = malloc(strlen(path)+strlen(direntp->d_name)+2);
-                        sprintf(temp_path, "%s/%s", path, direntp->d_name);
-                        for(int i = 0; i<file_count; i++) {
-                                if (strcmp(oldfiles[i],temp_path) == 0) {
-                                        checking = 1;
-                                }
-                        }
-                        if (checking == 0) {
-                                push(temp_path);
-                        }
-                    break;
-                case DT_DIR:            
-                        npath=malloc(strlen(path)+strlen(direntp->d_name)+2);
-                        sprintf(npath,"%s/%s",path, direntp->d_name);
-                        checkNewFiles(npath,    oldfiles, file_count);
-                        free(npath);
-                        break;
-        }
-    }
-    closedir(dir);
-    return 0;
-}
+//         switch (direntp->d_type) {
+//                 case DT_REG:
+//                         checking = 0;
+//                         temp_path = malloc(strlen(path)+strlen(direntp->d_name)+2);
+//                         sprintf(temp_path, "%s/%s", path, direntp->d_name);
+//                         for(int i = 0; i<file_count; i++) {
+//                                 if (strcmp(oldfiles[i],temp_path) == 0) {
+//                                         checking = 1;
+//                                 }
+//                         }
+//                         if (checking == 0) {
+//                                 push(temp_path);
+//                         }
+//                     break;
+//                 case DT_DIR:            
+//                         npath=malloc(strlen(path)+strlen(direntp->d_name)+2);
+//                         sprintf(npath,"%s/%s",path, direntp->d_name);
+//                         check_new_files(npath,    oldfiles, file_count);
+//                         free(npath);
+//                         break;
+//         }
+//     }
+//     closedir(dir);
+//     return 0;
+// }
 
-int countFiles(char *path)
-{
-    DIR *dir = NULL;
-    struct dirent *direntp = NULL;
+// int count_files(char *path)
+// {
+//     DIR *dir = NULL;
+//     struct dirent *direntp = NULL;
 
-    char *npath;
-    int count=0;
+//     char *npath;
+//     int count=0;
 
-    if (!path) {
-            fprintf(fp, "[%s %s] given path is null", __DATE__, __TIME__);
-            exit(1);
-    }
+//     if (!path) {
+//             fprintf(fp, "[%s %s] given path is null", __DATE__, __TIME__);
+//             exit(1);
+//     }
 
-    dir = opendir(path);
+//     dir = opendir(path);
 
-    if (dir == NULL ) { 
-            fprintf(fp, "[%s %s] directory %s does not exist", __DATE__, __TIME__, path);
-            fflush(fp);
-            exit(1);
-    }
+//     if (dir == NULL ) { 
+//             fprintf(fp, "[%s %s] directory %s does not exist", __DATE__, __TIME__, path);
+//             fflush(fp);
+//             exit(1);
+//     }
 
-    while( (direntp = readdir(dir))) {
-            if (strcmp(direntp->d_name,".") == 0 || strcmp(direntp->d_name,"..") == 0) {
-                    continue;
-            }
+//     while( (direntp = readdir(dir))) {
+//             if (strcmp(direntp->d_name,".") == 0 || strcmp(direntp->d_name,"..") == 0) {
+//                     continue;
+//             }
 
-            switch (direntp->d_type) {
-                case DT_REG:
-                        count++;
-                        break;
-                case DT_DIR:            
-                        npath=malloc(strlen(path)+strlen(direntp->d_name)+2);
-                        sprintf(npath,"%s/%s",path, direntp->d_name);
-                        count += countFiles(npath);
-                        free(npath);
-                        break;
-            }
-    }
-    closedir(dir);
-    return count;
-}
+//             switch (direntp->d_type) {
+//                 case DT_REG:
+//                         count++;
+//                         break;
+//                 case DT_DIR:            
+//                         npath=malloc(strlen(path)+strlen(direntp->d_name)+2);
+//                         sprintf(npath,"%s/%s",path, direntp->d_name);
+//                         count += count_files(npath);
+//                         free(npath);
+//                         break;
+//             }
+//     }
+//     closedir(dir);
+//     return count;
+// }
 
 int mkdir_p(const char *path)
 {
@@ -349,7 +358,7 @@ int mkdir_p(const char *path)
     return 0;
 }
 
-int removeChars(char *s, char c)
+void remove_chars(char *s, char c)
 {
     int writer = 0, reader = 0;
 
@@ -363,11 +372,9 @@ int removeChars(char *s, char c)
             reader++;    
     }
     s[writer]=0;
-
-    return 0;
 }
 
-int countSymbols(char *path)
+int count_symbols(char *path)
 {
     FILE *fp_counter;
 	int count = 0;
@@ -382,13 +389,13 @@ int countSymbols(char *path)
 	return count;
 }
 
-struct config configuration(char *str, struct config config, char *type) 
+struct config set_configuration(char *str, struct config config, char *type) 
 {
     char ptr[100];
     strcpy(ptr, strchr(str, '='));
-    removeChars(ptr, ' ');
-    removeChars(ptr, '=');
-    removeChars(ptr, '\n');
+    remove_chars(ptr, ' ');
+    remove_chars(ptr, '=');
+    remove_chars(ptr, '\n');
 
     if (strcmp(type, "audio") == 0){
             strcpy(config.audio_type.types, ptr);
@@ -411,30 +418,28 @@ struct config read_config()
     config.document_type.monitor = 0;
     config.photo_type.monitor = 0;
 
-	int symbols = 0;
-    char *ptr;
+    int symbols = 0;
+    char *ptr = NULL;
     char line[symbols];
-    char log_file[11];
 
-    strcpy(log_file, "config.cfg");
-
-    if ((fp_config = fopen(log_file, "r")) == NULL) {
+    if ((fp_config = fopen(CONFIGFILE, "r")) == NULL) {
             fprintf(fp, "[%s %s] Can't find config file!", __DATE__, __TIME__);
             exit(1);
     }
 
-    symbols = countSymbols(log_file);
+    symbols = count_symbols(CONFIGFILE);
 
 	while (fgets(line, symbols, fp_config) != NULL) {   
             if (strstr(line, "audio_types =") != NULL) {
-                    config = configuration(line, config, "audio");
+                    config = set_configuration(line, config, "audio");
             } else if (strstr(line, "video_types =") != NULL) {
-                    config = configuration(line, config, "video");
+                    config = set_configuration(line, config, "video");
             } else if (strstr(line, "document_types =") != NULL) {
-                    config = configuration(line, config, "document");
+                    config = set_configuration(line, config, "document");
             } else if (strstr(line, "photo_types =") != NULL) {
-                    config = configuration(line, config, "photo");
+                    config = set_configuration(line, config, "photo");
             } else if (strstr(line, "types_to_watch =") != NULL) {
+                    //neišskiriama atmintis ptr
                     strcpy(ptr, strchr(line, '='));
                     strcpy(config.types_to_watch, ptr);
                     if ((strstr(ptr, "audio") != NULL )) {
@@ -452,14 +457,15 @@ struct config read_config()
             } else if (strstr(line, "dir_to_watch =") != NULL) {
                         ptr = malloc (strlen(line)+2);
                         strcpy(ptr, strchr(line, '='));
-                        removeChars(ptr, ' ');
-                        removeChars(ptr, '=');
-                        removeChars(ptr, '\n');
+                        remove_chars(ptr, ' ');
+                        remove_chars(ptr, '=');
+                        remove_chars(ptr, '\n');
                         strcpy(config.dir_to_watch, ptr);
             }
     }
-
-    free(ptr);
+    if (ptr != NULL) {
+                free(ptr);
+    }
 
     if(fclose(fp_config) != 0) {
         fprintf(fp, "[%s %s] closing config file failed!\n", __DATE__, __TIME__);
@@ -467,36 +473,35 @@ struct config read_config()
     return config;
 }
 
-static void daemon_process()
+int daemon_process()
 {
     pid_t process_id = 0;
     pid_t sid = 0;
-    int x = 0;
 
     process_id = fork();
 
     if (process_id < 0) {
-            printf("fork failed\n");
-            exit(1);
+            goto clear_files;
     }
     if (process_id > 0){
-            printf("process_id of child process %d \n", process_id);
-            exit(0);
+            goto clear_files;
     }
 
     sid = setsid();
 
     if (sid < 0){
-            printf("sid failed");
-            exit(1);
+            goto clear_files;
     }
     umask(0);
     chdir("/");
 
-    for (x = sysconf (_SC_OPEN_MAX); x>=0; x--){
-            close(x);
-    }
-    // close(STDERR_FILENO);
-    // close(STDOUT_FILENO);
-    // close(STDERR_FILENO);
+    close(STDERR_FILENO);
+    close(STDOUT_FILENO);
+    close(STDIN_FILENO);
+
+    return 0;
+
+    clear_files:
+        fclose(fp);
+        exit(0);
 }

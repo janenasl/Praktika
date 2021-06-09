@@ -1,21 +1,17 @@
 CC:=gcc
-CFLAGS:=-Wall -Werror -pedantic
+BIN:=main
+CFLAGS:=
 CURDIR:=$(shell pwd)
-EXTRAFLAGS:=-shared -fpic
-BIN:=mover
-LIB:=libdynamic.so
-PREFIX ?= /usr
+SRC:=$(wildcard *.c)
+OBJ:=$(SRC:.c=.o)
 LDFLAGS:=-L$(CURDIR)
 
 .phony = all clean
 
-all: $(LIB) $(BIN)
+all: $(BIN)
 
-$(LIB): ./lib/dynamiclibrary.c
-		$(CC) $(CFLAGS) $(EXTRAFLAGS) -o $@ $<
-
-$(BIN): main.c
-		$(CC) -g -D_DEFAULT_SOURCE $(CFLAGS) -o $@ $< $(LDFLAGS) -ldynamic  -Wl,-rpath=$(CURDIR)
+$(BIN): $(OBJ)
+		$(CC) $(CFLAGS) -o $@ $^ -I$(CURDIR)
 
 clean:
-		$(RM) $(BIN) $(LIB)
+		$(RM) $(BIN) $(OBJ)
