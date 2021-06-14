@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
         cleanup();
         free(config);
     cleanup_1:
-        return rc;
+        return 0;
 }
 
 int main_process(struct config *config)
@@ -52,11 +52,11 @@ int main_process(struct config *config)
 
     file_count = count_files(config->dir_to_watch);
     if(file_count == -1) {
-            goto clean;
+            goto clean_1;
     }
 
     if(save_not_movable_files(config->dir_to_watch) == 1) {
-            goto clean;
+            goto clean_1;
     }
     not_movable = take_list(length());
     not_movable_count = length();
@@ -66,30 +66,26 @@ int main_process(struct config *config)
             sleep(1);
             temp_file_count = count_files(config->dir_to_watch);
             if(temp_file_count == -1) {
-                    goto clean;
+                    goto clean_1;
             }
 
             if (temp_file_count != file_count) {
                     if (check_new_files(config->dir_to_watch, not_movable, not_movable_count) == 1) {
-                            goto clean;
+                            goto clean_1;
                     }
-
-                    cleaning(not_movable_count, not_movable);
-                    not_movable = (char **) malloc(length() * sizeof(char**));
 
                     new_files = take_list(length());
                     new_files_count = length();
+                    clean_arrays(not_movable_count, not_movable);
 
                     if (check_if_file_move(new_files, *config, length()) == 1) {
-                            goto clean;
+                            goto clean_2;
                     }
-                    cleaning(new_files_count, new_files);
-
-                    new_files = (char **) malloc(length() * sizeof(char**));
+                    clean_arrays(new_files_count, new_files);
                     delete_list();
 
                     if(save_not_movable_files(config->dir_to_watch) == 1) {
-                            goto clean;
+                            goto clean_1;
                     }
 
                     not_movable = take_list(length());
@@ -100,32 +96,18 @@ int main_process(struct config *config)
                     break;
             }
     }
-
-    clean:
-            for (int i = 0; i < not_movable_count; i++) {
-                if (not_movable) {
-                    free(not_movable[i]);
-                }
-            }
-            for (int i = 0; i < new_files_count-1; i++) {
-                if (new_files) {
-                        free(new_files[i]);
-                }
-            }
+    clean_2:
+            if (length() > 0) 
+            clean_arrays(new_files_count, new_files);
+    clean_1:
+            clean_arrays(not_movable_count, not_movable);
             if (length() > 0) {
                     delete_list();
-            }
-
-            if (not_movable)
-                    free(not_movable);
-            
-            if (new_files) {
-                    free(new_files);
             }
         return 1;
 }
 
-int cleaning(int count, char **array) 
+int clean_arrays(int count, char **array) 
 {
     for (int i = 0; i < count; i++) {
             free(array[i]);
