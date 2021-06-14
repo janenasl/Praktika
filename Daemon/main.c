@@ -49,7 +49,6 @@ int main_process(struct config *config)
     int temp_file_count = 0;
     int new_files_count = 0;
     int not_movable_count = 0;
-    int a;
 
     file_count = count_files(config->dir_to_watch);
     if(file_count == -1) {
@@ -75,58 +74,48 @@ int main_process(struct config *config)
                             goto clean;
                     }
 
-                    // for (int i = 0; i < not_movable_count; i++) {
-                    //         free(not_movable[i]);
-                    // }
-                    // free(not_movable);
-                    // not_movable = (char **) malloc(length() * sizeof(char**));
-                    printf("%s\n", not_movable[0]);
+                    cleaning(not_movable_count, not_movable);
+                    not_movable = (char **) malloc(length() * sizeof(char**));
+
                     new_files = take_list(length());
                     new_files_count = length();
 
                     if (check_if_file_move(new_files, *config, length()) == 1) {
                             goto clean;
                     }
+                    cleaning(new_files_count, new_files);
 
-                    // for (int i = 0; i < new_files_count; i++) {
-                    //         free(new_files[i]);
-                    // }
-                    //free(new_files);
-
-                    //new_files = (char **) realloc(new_files, length() * sizeof(char**));
+                    new_files = (char **) malloc(length() * sizeof(char**));
                     delete_list();
 
                     if(save_not_movable_files(config->dir_to_watch) == 1) {
                             goto clean;
                     }
+
                     not_movable = take_list(length());
                     not_movable_count = length();
                     delete_list();
 
                     file_count = temp_file_count;
-                    printf("įvesk:\n");
-                    scanf("%d", &a);
-                    if (a == 1) {
-                        break;
-                    }
+                    break;
             }
     }
 
     clean:
-            // for (int i = 0; i < not_movable_count; i++) {
-            //     if (not_movable) {
-            //         free(not_movable[i]);
-            //     }
-            // }
-            // for (int i = 0; i < new_files_count-1; i++) {
-            //     if (new_files) {
-            //             free(new_files[i]);
-            //     }
-            // }
+            for (int i = 0; i < not_movable_count; i++) {
+                if (not_movable) {
+                    free(not_movable[i]);
+                }
+            }
+            for (int i = 0; i < new_files_count-1; i++) {
+                if (new_files) {
+                        free(new_files[i]);
+                }
+            }
             if (length() > 0) {
                     delete_list();
             }
-            printf("labas\n");
+
             if (not_movable)
                     free(not_movable);
             
@@ -134,6 +123,15 @@ int main_process(struct config *config)
                     free(new_files);
             }
         return 1;
+}
+
+int cleaning(int count, char **array) 
+{
+    for (int i = 0; i < count; i++) {
+            free(array[i]);
+    }
+    free(array);
+    return 0;
 }
 
 int check_if_file_move(char **files, struct config config, int file_count)
@@ -199,7 +197,6 @@ int move_files(char *file_full_path, char *file_name, char *directory_type, char
 struct config *read_config()
 {
     int symbols = 0;
-    char *ptr;
     char line[200];
 
     FILE *fp_config = NULL;

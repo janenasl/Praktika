@@ -41,9 +41,9 @@ char **take_list(int length)
     int i = 0;
 
     while(ptr != NULL) {
-        //sub_str[i] = (char *) malloc(sizeof(char) * strlen(ptr->data)+1);
-        //strcpy(sub_str[i], ptr->data);
-        sub_str[i] = ptr->data;
+        sub_str[i] = (char *) malloc(sizeof(char) * strlen(ptr->data)+1);
+        strcpy(sub_str[i], ptr->data);
+        //sub_str[i] = ptr->data;
         ptr = ptr->next;
         i++;
     }

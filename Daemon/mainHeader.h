@@ -30,4 +30,5 @@ int set_configurations(char *line, struct config *config);
 int check_if_file_move(char **files, struct config config, int file_count);
 int move_files(char *file_full_path, char *file_name, char *directory_type, char *owner);
 int daemon_process();
+int cleaning(int count, char **array);
 void remove_chars(char *s, char c);

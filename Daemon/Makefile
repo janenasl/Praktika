@@ -1,6 +1,6 @@
 CC:=gcc
 BIN:=main
-CFLAGS:=
+CFLAGS:=-Wall -Werror -pedantic
 CURDIR:=$(shell pwd)
 SRC:=$(wildcard *.c)
 OBJ:=$(SRC:.c=.o)

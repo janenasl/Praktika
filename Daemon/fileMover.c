@@ -32,7 +32,7 @@ int save_not_movable_files(char *path)
             write_to_log(LOG_ERROR, "directory to watch does not exist\n");
             return 1;
     }
-
+    
     while( (direntp = readdir(dir))) {
             if (strcmp(direntp->d_name,".") == 0 || strcmp(direntp->d_name,"..") == 0) {
                     continue;
@@ -203,17 +203,20 @@ char *get_filename_ext(char *filename)
 int check_extensions(char *types, char *extension)
 {
     char *token;
-    char *temp_types = (char *) malloc(sizeof(char *) * strlen(types)+1);
-    //char temp_types[strlen(types)+1];
+    //char *temp_types = (char *) malloc(sizeof(char *) * strlen(types)+1);
+    char temp_types[strlen(types)+1];
     if (temp_types == NULL) {
         return 1;
     }
     strcpy(temp_types, types);
-    while ((token = strtok_r(temp_types, ",", &temp_types))) {
+    printf("temp types: %s\n", temp_types);
+    token = strtok(temp_types, ",");
+    while (token != NULL) {
+        printf("token: %s\n", token);
         if (strcmp(token, extension) == 0) {
-                //printf("labas\n");
             return 0;
         }
+        token = strtok(NULL, ",");
     }
     return 1;
 }
