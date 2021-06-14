@@ -11,7 +11,7 @@ LDFLAGS:=-L$(CURDIR)
 all: $(BIN)
 
 $(BIN): $(OBJ)
-		$(CC) $(CFLAGS) -o $@ $^ -I$(CURDIR)
+		$(CC) $(CFLAGS) -o $@ $^
 
 clean:
 		$(RM) $(BIN) $(OBJ)

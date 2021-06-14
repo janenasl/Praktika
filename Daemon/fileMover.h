@@ -1,0 +1,10 @@
+int count_files(char *path);
+int check_new_files(char *path, char **oldfiles, int file_count);
+int save_not_movable_files(char *path);
+int mkdir_p(const char *path);
+char *get_file_name(char *str);
+char *get_filename_ext(char *filename);
+char *find_owner();
+int count_symbols(char *p);
+int check_extensions(char *types, char *extension);
+int check_if_dir_exists(char *dir);
