@@ -21,15 +21,13 @@ int main(int argc, char* argv[])
 
     int rc = 0;
     rc = init_logger();
-    if (rc) {
+    if (rc)
         goto cleanup_1;
-    }
 
     write_to_log(LOG_INFO, "----- program started ------");
     config = read_config();
-    if (config == NULL) {
+    if (config == NULL)
             goto cleanup_2;
-    }
 
     //daemon_process();
     main_process(config);
@@ -51,13 +49,12 @@ int main_process(struct config *config)
     int not_movable_count = 0;
 
     file_count = count_files(config->dir_to_watch);
-    if(file_count == -1) {
+    if(file_count == -1)
             goto clean_1;
-    }
 
-    if(save_not_movable_files(config->dir_to_watch) == 1) {
+    if(save_not_movable_files(config->dir_to_watch) == 1)
             goto clean_1;
-    }
+
     not_movable = take_list(length());
     not_movable_count = length();
     delete_list();
@@ -65,45 +62,39 @@ int main_process(struct config *config)
     while(1) {
             sleep(1);
             temp_file_count = count_files(config->dir_to_watch);
-            if(temp_file_count == -1) {
+            if(temp_file_count == -1)
                     goto clean_1;
-            }
 
             if (temp_file_count != file_count) {
-                    if (check_new_files(config->dir_to_watch, not_movable, not_movable_count) == 1) {
+                    if (check_new_files(config->dir_to_watch, not_movable, not_movable_count) == 1)
                             goto clean_1;
-                    }
 
                     new_files = take_list(length());
                     new_files_count = length();
                     clean_arrays(not_movable_count, not_movable);
 
-                    if (check_if_file_move(new_files, *config, length()) == 1) {
+                    if (check_if_file_move(new_files, *config, length()) == 1)
                             goto clean_2;
-                    }
+
                     clean_arrays(new_files_count, new_files);
                     delete_list();
 
-                    if(save_not_movable_files(config->dir_to_watch) == 1) {
+                    if(save_not_movable_files(config->dir_to_watch) == 1)
                             goto clean_1;
-                    }
 
                     not_movable = take_list(length());
                     not_movable_count = length();
                     delete_list();
-
                     file_count = temp_file_count;
-                    break;
             }
     }
     clean_2:
             if (length() > 0) 
-            clean_arrays(new_files_count, new_files);
+                    clean_arrays(new_files_count, new_files);
     clean_1:
             clean_arrays(not_movable_count, not_movable);
-            if (length() > 0) {
+            if (length() > 0)
                     delete_list();
-            }
         return 1;
 }
 
@@ -184,14 +175,10 @@ struct config *read_config()
     FILE *fp_config = NULL;
     struct config *config = malloc(sizeof(struct config)); 
 
-    if (config == NULL) {
+    if (config == NULL)
             return NULL;
-    }
 
-    config->audio_type.monitor = 0;
-    config->video_type.monitor = 0;
-    config->document_type.monitor = 0;
-    config->photo_type.monitor = 0;
+    memset(config, 0, sizeof(struct config));
 
     if ((fp_config = fopen(CONFIGFILE, "r")) == NULL) {
             write_to_log(LOG_ERROR, "Can't find config file!");
@@ -200,9 +187,8 @@ struct config *read_config()
 
     symbols = count_symbols(CONFIGFILE);
 
-    if (symbols == -1) {
+    if (symbols == -1)
             return NULL;
-    }
     
 	while (fgets(line, symbols, fp_config) != NULL) { 
             if (strlen(line) > 5) {
