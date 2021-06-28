@@ -4,14 +4,13 @@
 #include <iotp_device.h>
 #include <libubox/blobmsg_json.h>
 #include <libubus.h>
-#include "main_header.h"
-#include "logger.h"
+#include "ibm.h"
 
 #define UCI_CONFIG_FILE "ibm"
 
 int main(void)
 {
-    struct ubus_context *ctx;
+    struct ubus_context *ctx = NULL;
     IoTPConfig *config = NULL;
     IoTPDevice *device = NULL;
 
@@ -26,10 +25,8 @@ int main(void)
         return 1;
 
     write_to_log(LOG_INFO, "Program started");
-
     if (connect_to_ibm(&config, &device) != 0)
             goto cleanup_1;
-
     if (subscribe_to_ibm_commands(&device) != 0)
             goto cleanup_2;
 
@@ -47,7 +44,7 @@ int main(void)
 
 static void board_cb(struct ubus_request *req, int type, struct blob_attr *msg) 
 {
-    char *load = (char*)req->priv;
+    char *memories = (char*)req->priv;
 
     struct blob_attr *tb[__INFO_MAX];
     struct blob_attr *memory[__MEMORY_MAX];
@@ -75,7 +72,7 @@ static void board_cb(struct ubus_request *req, int type, struct blob_attr *msg)
 
     json = blobmsg_format_json(buf.head, true);
 
-    strcpy(load, json);
+    strcpy(memories, json);
     free(json);
 }
 
@@ -84,7 +81,7 @@ int ubus_method(struct ubus_context **ctx, IoTPDevice **device)
     MQTTProperties *properties = (MQTTProperties *)malloc(sizeof(MQTTProperties));
     uint32_t id;
 
-    char *load = (char *) malloc (sizeof(char *)+500);
+    char *memories = (char *) malloc (sizeof(char *)+500);
     *ctx = ubus_connect(NULL);
     if (!*ctx) {
             write_to_log(LOG_ERROR, "Failed connect to ubus");
@@ -93,15 +90,19 @@ int ubus_method(struct ubus_context **ctx, IoTPDevice **device)
 
     if (ubus_lookup_id(*ctx, "system", &id))
             write_to_log(LOG_ERROR, "cannot request memory info from procd");
-
+    
     while(deamonize) {
-            ubus_invoke(*ctx, id, "info", NULL, board_cb, load, 3000);
+            ubus_invoke(*ctx, id, "info", NULL, board_cb, memories, 3000);
             
-            if (send_data(*device, load, properties) != 0 || !deamonize)
+            if (send_data(*device, memories, properties) != 0 || !deamonize) {
+                    free(memories);
                     return -1;
+            }
             
             sleep(5);
     }
+
+    free(memories);
 
     return 0;
 }
@@ -136,7 +137,7 @@ int subscribe_to_ibm_commands(IoTPDevice **device)
 int connect_to_ibm(IoTPConfig **config, IoTPDevice **device)
 {
     rc = IOTPRC_SUCCESS;
-    char *orgId, *typeId, *deviceId, *auth;
+    char orgId[100], typeId[100], deviceId[100], auth[100];
     char *message;
 
     if (load_config(&orgId, &typeId, &deviceId, &auth) != 0) {
@@ -149,12 +150,7 @@ int connect_to_ibm(IoTPConfig **config, IoTPDevice **device)
     IoTPConfig_setProperty(*config, "identity.typeId", typeId);
     IoTPConfig_setProperty(*config, "identity.deviceId", deviceId);
     IoTPConfig_setProperty(*config, "auth.token", auth);
-
-    free(orgId);
-    free(typeId);
-    free(deviceId);
-    free(auth);
-
+    
     if (rc == IOTPRC_SUCCESS) {
             rc = IoTPDevice_create(device, *config);
             if (rc == IOTPRC_SUCCESS) {
@@ -166,6 +162,46 @@ int connect_to_ibm(IoTPConfig **config, IoTPDevice **device)
             write_to_log(LOG_ERROR, message);
             return rc;
     }
+}
+
+int load_config(char *orgId, char *typeId, char *deviceId, char *auth)
+{
+    struct uci_context *ctx = NULL;
+    struct uci_package *p = NULL;
+    struct uci_element *e = NULL;
+    const char *Value = NULL;
+
+    ctx = uci_alloc_context();			
+    if (UCI_OK != uci_load(ctx, UCI_CONFIG_FILE, &p)) {
+            write_to_log(LOG_ERROR, "Error with uci load");
+            uci_free_context(ctx);
+            return -1;
+    }
+    uci_foreach_element(&p->sections, e) {
+            struct uci_section *s = uci_to_section(e);
+            if (NULL != (Value = uci_lookup_option_string(ctx, s, "orgId"))) {
+                    strcpy(orgId, Value);
+            }
+            if (NULL != (Value = uci_lookup_option_string(ctx, s, "typeId"))) {
+                    strcpy(typeId, Value);
+            }
+            if (NULL != (Value = uci_lookup_option_string(ctx, s, "deviceId"))) {
+                    strcpy(deviceId, Value);
+            }
+            if (NULL != (Value = uci_lookup_option_string(ctx, s, "auth"))) {
+                    strcpy(auth, Value);
+            }
+    }
+    uci_unload(ctx, p);
+    uci_free_context(ctx);
+    ctx = NULL;
+
+    return 0;
+}
+
+void term_proc(int sigterm) 
+{
+	deamonize = 0;
 }
 
 int disconnect_from_ibm(IoTPConfig **config, IoTPDevice **device)
@@ -185,44 +221,4 @@ int disconnect_from_ibm(IoTPConfig **config, IoTPDevice **device)
             write_to_log(LOG_ERROR, message);
             return 1;
     }
-}
-
-int load_config(char **orgId, char **typeId, char **deviceId, char **auth)
-{
-    struct uci_context *ctx = NULL;
-    struct uci_package *p = NULL;
-    struct uci_element *e;
-    const char *Value = NULL;
-
-    ctx = uci_alloc_context();			
-    if (UCI_OK != uci_load(ctx, UCI_CONFIG_FILE, &p)) {
-            write_to_log(LOG_ERROR, "Error with uci load");
-            uci_free_context(ctx);
-            return -1;
-    }
-    uci_foreach_element(&p->sections, e) {
-            struct uci_section *s = uci_to_section(e);
-            if (NULL != (Value = uci_lookup_option_string(ctx, s, "orgId"))) {
-                    *orgId = strdup(Value);
-            }
-            if (NULL != (Value = uci_lookup_option_string(ctx, s, "typeId"))) {
-                    *typeId = strdup(Value);
-            }
-            if (NULL != (Value = uci_lookup_option_string(ctx, s, "deviceId"))) {
-                    *deviceId = strdup(Value);
-            } 
-            if (NULL != (Value = uci_lookup_option_string(ctx, s, "auth"))) {
-                    *auth = strdup(Value);
-            }
-    }
-    uci_unload(ctx, p);
-    uci_free_context(ctx);
-    ctx = NULL;
-
-    return 0;
-}
-
-void term_proc(int sigterm) 
-{
-	deamonize = 0;
 }
