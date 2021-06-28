@@ -1,1 +1,1 @@
-Naujas
+Programa, kuri veikia kaip daemon procesas. Nuskaito config ir visus naujus failus iš nurodyto folderio perkelia į tam tikras direktorijas
