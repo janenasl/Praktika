@@ -14,11 +14,6 @@ int main(void)
     IoTPConfig *config = NULL;
     IoTPDevice *device = NULL;
 
-    struct sigaction action;
-	memset(&action, 0, sizeof(struct sigaction));
-	action.sa_handler = term_proc;
-	sigaction(SIGTERM, &action, NULL);
-
     rc = IOTPRC_SUCCESS;
 
     if (init_logger() != 0)
@@ -79,9 +74,14 @@ static void board_cb(struct ubus_request *req, int type, struct blob_attr *msg)
 int ubus_method(struct ubus_context **ctx, IoTPDevice **device)
 {
     MQTTProperties *properties = (MQTTProperties *)malloc(sizeof(MQTTProperties));
-    uint32_t id;
-
     char *memories = (char *) malloc (sizeof(char *)+500);
+    uint32_t id;
+    
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = term_proc;
+    sigaction(SIGTERM, &action, NULL);
+
     *ctx = ubus_connect(NULL);
     if (!*ctx) {
             write_to_log(LOG_ERROR, "Failed connect to ubus");
