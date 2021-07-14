@@ -1,5 +1,8 @@
 #include "mqtt_sub.h"
 
+/**
+* subscribe to given topics
+*/
 extern int subscribe_topics(struct mosquitto **mosq, struct topic **topics, int tc)
 {
     for (int i = 0; i<tc; i++) {
@@ -11,10 +14,12 @@ extern int subscribe_topics(struct mosquitto **mosq, struct topic **topics, int 
     return 0;
 }
 
+/**
+* connect to broker, set connection settings
+*/
 extern int connect_to_broker(struct mosquitto **mosq, struct settings **settings, struct topic **topics, int tc)
 {
     int rc;
-    
     mosquitto_lib_init();
     
     *mosq = mosquitto_new(NULL, true, NULL);
@@ -61,8 +66,6 @@ static void on_connect_cb(struct mosquitto *mosq, void *obj, int rc)
 static void on_message_cb(struct mosquitto *mosq, void *obj, struct mosquitto_message *msg)
 {
     if (msg->payloadlen != 0) {
-        printf("siunčiu!");
             add_message_to_db(msg->topic, msg->payload);
-            printf("išsiunčiau\n");
     }
 }

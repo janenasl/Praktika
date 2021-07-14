@@ -1,16 +1,19 @@
 #include "mqtt_config.h"
 
+/**
+* load config
+*/
 static int load_config(struct uci_package **p)
 {
     struct uci_context *ctx = NULL;
     ctx = uci_alloc_context();
     if (ctx == NULL) {
-            //write_to_log(LOG_ERROR, "uci context memory allocation failed");
+            fprintf(stderr, "uci context memory allocation failed");
             return -2;
     }
     		
     if (UCI_OK != uci_load(ctx, CONFIG_FILE, p)) {
-            //write_to_log(LOG_ERROR, "uci load failed");
+            fprintf(stderr, "uci load failed");
             uci_free_context(ctx);
             return -1;
     }
@@ -18,6 +21,9 @@ static int load_config(struct uci_package **p)
     return 0;
 }
 
+/**
+* set user defined settings in web to struct settings
+*/
 static int set_settings(char *option_name, char *option_value, struct settings **settings)
 {
     if (strcmp(option_name, "remote_address") == 0) {
@@ -54,9 +60,12 @@ static int set_settings(char *option_name, char *option_value, struct settings *
                     strcpy((*settings)->key_file, option_value);
             }
     }
+    return 0;
 }
 
-
+/**
+* loop through config sections and set topics and settings
+*/
 extern int get_topics_and_settings(struct topic **topics, struct settings **settings)
 {
     struct uci_package *p = NULL;
@@ -64,7 +73,9 @@ extern int get_topics_and_settings(struct topic **topics, struct settings **sett
     int tc = 0;
     int k = 0;
 
-    load_config(&p);
+    if (load_config(&p) != 0) {
+            return -1;
+    }
 
     tc = count_topics(p);
     if (tc > 0) {
@@ -73,7 +84,15 @@ extern int get_topics_and_settings(struct topic **topics, struct settings **sett
             return -1;
     }
 
+    if (*topics == NULL) {
+            return -3;
+    }
+
     *settings = (struct settings *) malloc (sizeof(struct settings));
+    
+    if (*settings == NULL) {
+            return -2;
+    }
 
     uci_foreach_element(&p->sections, i) {
             struct uci_section *s = uci_to_section(i);
@@ -96,6 +115,10 @@ extern int get_topics_and_settings(struct topic **topics, struct settings **sett
     return k;
 }
 
+/**
+* count user defined topics
+* return count-2 because  config always has mqtt_settings and mqtt_msg and we need only count of section topics
+*/
 static int count_topics(struct uci_package *p)
 {
     int count = 0;
@@ -104,5 +127,5 @@ static int count_topics(struct uci_package *p)
             count++;
     }
 
-    return count-2; //because config always has mqtt_settings and mqtt_msg and we need only topics
+    return count-2;
 }
