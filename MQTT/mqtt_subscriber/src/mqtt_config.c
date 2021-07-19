@@ -63,69 +63,105 @@ static int set_settings(char *option_name, char *option_value, struct settings *
     return 0;
 }
 
+extern int set_topics(char *opt_name, char *opt_value, int k, struct topic **topics)
+{
+    if (strcmp(opt_name, "topic") == 0) {
+        strcpy((*topics)[k].name, opt_value);
+    }  else if (strcmp(opt_name, "qos") == 0) {
+        (*topics)[k].qos = atoi(opt_value);
+    }
+    return 0;
+}
+
+extern int set_events()
+{
+
+}
+
 /**
 * loop through config sections and set topics and settings
 */
-extern int get_topics_and_settings(struct topic **topics, struct settings **settings)
+extern int get_parameters(struct topic **topics, struct settings **settings, struct events **events)
 {
     struct uci_package *p = NULL;
     struct uci_element *i, *j; 
-    int tc = 0;
-    int k = 0;
+    int topic_count_overall = 0;
+    int topic_count = 0;
+    int event_count_overall = 0;
+    int event_count = 0;
 
     if (load_config(&p) != 0) {
             return -1;
     }
 
-    tc = count_topics(p);
-    if (tc > 0) {
-            *topics = (struct topic *) malloc (sizeof(struct topic) * tc);
+    topic_count_overall = count_sections(p, 0);
+    if (topic_count_overall > 0) {
+            *topics = (struct topic *) malloc(sizeof(struct topic) * topic_count_overall+1);
     } else {
             return -1;
     }
 
-    if (*topics == NULL) {
+    if (*topics == NULL)
             return -3;
-    }
 
-    *settings = (struct settings *) malloc (sizeof(struct settings));
-    
-    if (*settings == NULL) {
+    *settings = (struct settings *) malloc(sizeof(struct settings)+1);
+    if (*settings == NULL)
             return -2;
-    }
+
+    event_count_overall = count_sections(p, 1);
+    if (event_count_overall > 0)
+            *events = (struct events *) malloc(sizeof(struct events) * event_count_overall+1);
 
     uci_foreach_element(&p->sections, i) {
             struct uci_section *s = uci_to_section(i);
 
             uci_foreach_element(&s->options, j) {
                     struct uci_option *option = uci_to_option(j);
-                    if (strcmp(option->e.name, "topic") == 0) {
-                            strcpy((*topics)[k].name, option->v.string);
-                    }  else if (strcmp(option->e.name, "qos") == 0) {
-                            (*topics)[k].qos = atoi(option->v.string);
-                    }
-                    if (strcmp(s->type, "mqtt_sub") == 0) {
+
+                    if (strcmp(s->type, "mqtt_topic") == 0)
+                            set_topics(option->e.name, option->v.string, topic_count, topics);
+
+                    if (strcmp(s->type, "mqtt_sub") == 0)
                             set_settings(option->e.name, option->v.string, settings);
-                    }
+
+                    if (strcmp(s->type, "mqtt_event") == 0) 
+                            set_events(option->e.name, option->v.string, event_count, events);
             }
-            if (strcmp(s->type, "mqtt_topic") == 0) {
-                    k++;
-            }
+            if (strcmp(s->type, "mqtt_topic") == 0)
+                    topic_count++;
+
+            if (strcmp(s->type, "mqtt_event") == 0)
+                    event_count++;
     }
-    return k;
+    return topic_count_overall;
 }
 
 /**
-* count user defined topics
-* return count-2 because  config always has mqtt_settings and mqtt_msg and we need only count of section topics
+* count user defined events or topics
+* 0 - count topics
+* 1 - count events
 */
-static int count_topics(struct uci_package *p)
+static int count_sections(struct uci_package *p, int selection)
 {
     int count = 0;
     struct uci_element *i;
     uci_foreach_element(&p->sections, i) {
-            count++;
+            struct uci_section *s = uci_to_section(i);
+            switch (selection)
+            {
+                case 0:
+                    if(strcmp(s->type, "mqtt_topic") == 0)
+                    count++;
+                    break;
+                case 1:
+                    if (strcmp(s->type, "mqtt_event") == 0)
+                    count++;
+                    break;
+                default:
+                    fprintf(stderr, "select 0 for topics and 1 for events");
+                    return -1;
+            }
     }
 
-    return count-2;
+    return count;
 }
