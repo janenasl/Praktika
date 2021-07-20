@@ -28,12 +28,12 @@ int main(void)
             goto cleanup_1;
     }
 
-    while (deamonize) {
-            if (mosquitto_loop(mosq, -1, 1) != MOSQ_ERR_SUCCESS) {
+    //while (deamonize) {
+            if (mosquitto_loop_forever(mosq, -1, 1) != MOSQ_ERR_SUCCESS) {
                     fprintf(stderr, "Communications between the client and broker stopped");
                     goto cleanup_1;
             }
-    }
+    //}
 
     cleanup_1:
             mosquitto_disconnect(mosq);
