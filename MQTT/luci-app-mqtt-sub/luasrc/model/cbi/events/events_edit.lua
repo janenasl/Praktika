@@ -44,10 +44,16 @@ strval:depends("type","string")
 strval:value("0", "Equal To")
 strval:value("1", "Not Equal To")
 
-email = s:option(Value, "user_email", translate("Email address"), translate("Email address of user which will be informed in case of event successful"))
-email.datatype = "email"
-email.rmempty = false
-email.maxlength = "100"
+o = s:option(Value, "user_email", translate("Sender's email address"), translate("An address that will be used to send your email from. Allowed characters (a-zA-Z0-9._%+-)"))
+o.rmempty = false
+o.datatype = "email"
+o.placeholder = "email@domain.com"
 
+
+sender = s:option(ListValue, "sender", translate("Sender"), translate("Mail sender config"))
+m.uci:foreach("user_groups", "email", 
+            function(i) 
+                sender:value(i.name, i.name)
+            end)
 
 return m
