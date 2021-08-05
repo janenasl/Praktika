@@ -1,5 +1,7 @@
 #include <signal.h>
 #include "mqtt_sub.h"
+#include "linked_list.h"
+#include <unistd.h>
 
 volatile sig_atomic_t deamonize = 1;
 void term_proc(int sigterm)
@@ -11,33 +13,28 @@ int main(void)
 {
     struct mosquitto *mosq = NULL;
     struct settings *settings = NULL;
-    struct topic *topics = NULL;
-    int tc;
+    struct topic_node *head = NULL;
+    int rc = 0;
 
     struct sigaction action;
     memset(&action, 0, sizeof(struct sigaction));
     action.sa_handler = term_proc;
     sigaction(SIGTERM, &action, NULL);
 
-    tc = iniciate_config_read(&topics, &settings);
-    if (tc == -1)
-            return tc;
-
-    if (tc == -2)
+    if (iniciate_config_read(&head, &settings) != 0)
             goto cleanup_3;
 
-    if (connect_to_broker(&mosq, &settings, &topics, tc) != 0) {
+    if (connect_to_broker(&mosq, settings, head) != 0)
             goto cleanup_2;
-    }
-    if (subscribe_topics(&mosq, &topics, tc) != 0) {
-            goto cleanup_1;
-    }
 
+    if (subscribe_topics(&mosq, head) != 0)
+            goto cleanup_1;
+    
     while (deamonize) {
-            if (mosquitto_loop(mosq, -1, 1) != MOSQ_ERR_SUCCESS) {
-                    fprintf(stderr, "Communications between the client and broker stopped");
-                    goto cleanup_2;
-            }
+        if (mosquitto_loop(mosq, -1, 1) != MOSQ_ERR_SUCCESS) {
+                fprintf(stderr, "Communications between the client and broker stopped\n");
+                goto cleanup_2;
+        }
     }
 
     cleanup_1:
@@ -46,11 +43,9 @@ int main(void)
             mosquitto_destroy(mosq);
             mosquitto_lib_cleanup();
     cleanup_3:
-            if (topics != NULL) 
-                    free(topics);
+            if (head != NULL)
+                    delete_list(head);
             if (settings != NULL)
                     free(settings);
-            if (topics->event != NULL)
-                    free(topics->event);
             return 0;
 }

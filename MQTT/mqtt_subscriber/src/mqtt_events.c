@@ -2,17 +2,15 @@
 #include "mqtt_mail.h"
 
 /**
-* decimal operators:
-* 0 - <
-* 1 - >
-* 2 - <=
-* 3 - >=
-* 4 - ==
-* 5 - !=
-* string operators:
-* 0 - Equal
-* 1 - Not equal
-*/
+ * decimal operators:
+ * 0 - <
+ * 1 - >
+ * 2 - <=
+ * 3 - >=
+ * 4 - ==
+ * 5 - !=
+ * @return: 0 - success, 1 - failure
+ */
 static int process_dec_val(char *value, int dec_operator, char *event_value)
 {
     int sender_value = atoi(value);
@@ -48,10 +46,11 @@ static int process_dec_val(char *value, int dec_operator, char *event_value)
     return 1;
 }
 /**
-* string operators:
-* 0 - Equal
-* 1 - Not equal
-*/
+ * string operators:
+ * 0 - Equal
+ * 1 - Not equal
+ * @return: 0 - success, 1 - failure
+ */
 static int process_str_val(char *value, int dec_operator, char *event_value)
 {
     switch(dec_operator) {
@@ -69,7 +68,12 @@ static int process_str_val(char *value, int dec_operator, char *event_value)
     return 1;
 }
 
-static char *get_value_from_jobj(struct json_object *val)
+/**
+ * check json value type
+ * https://stackoverflow.com/questions/2279379/how-to-convert-integer-to-char-in-c
+ * @return: value of json object
+ */
+static char *get_value_from_jobj(struct json_object *val, int *decider)
 {
     enum json_type type;
     char *output = (char *) malloc(sizeof(char) * 200);
@@ -83,66 +87,74 @@ static char *get_value_from_jobj(struct json_object *val)
                     break;
             case json_type_double:
                     sprintf(output, "%f", json_object_get_double(val));
+                    *decider = 1;
                     break;
             case json_type_int:
                     sprintf(output, "%d", json_object_get_int(val));
+                     *decider = 1;
                     break;
             case json_type_string:
-                    output = (char *) json_object_get_string(val);
+                    sprintf(output, "%s", json_object_get_string(val));
+                     *decider = 2;
                     break;
             default:
                     output = NULL;
     }
-    // https://stackoverflow.com/questions/2279379/how-to-convert-integer-to-char-in-c
     return output;
 }
-
-extern int process_events(char *topic, char *payload, struct topic *topics)
+/**
+ * check if 
+ * @return: 0 - success, 1 - json problems, other - mail problems (see mqtt_mail.c)
+ */
+extern int process_events(char *topic, char *payload, struct topic_node *topics)
 {
     struct json_object *jobj = NULL;
-    char *value = NULL;
-    int ec = 0;
+    char *msg_value = NULL;
     int rc = 1;
+    int decider = 0; //!< tells if json value is number or string
 
     jobj = json_tokener_parse(payload);
     if (jobj == NULL) {
             fprintf(stderr, "event value has to be in JSON format\n");
-            return -1;
+            return 1;
     }
-    //int k = sizeof(topics)/sizeof(topics[0]);
-    int k=2;
-
-    for(int i = 0; i<k; i++) {
-            if (strcmp(topic, topics[i].name) != 0 || topics[i].ec == 0)
+    while (topics != NULL) {
+            if (strcmp(topic, topics->name) != 0) {
+                    topics = topics->next;
                     continue;
+            }
             
-            ec = topics[i].ec;
-
             json_object_object_foreach(jobj, key, val) {
                     if (key == NULL || val == NULL)
                             continue;
-
-                    value = get_value_from_jobj(val);
-                    if (value == NULL) {
+                    
+                    msg_value = get_value_from_jobj(val, &decider);
+                    if (msg_value == NULL) {
                             fprintf(stderr, "JSON value parsing failed\n");
-                            return -1;
+                            return 1;
                     }
-                    for(int j=0; j<ec; j++) {
+
+                    while (topics->head_event != NULL) {
                             rc = 1;
-                            if (strcmp(topics[i].event[j].type, "decimal") == 0)
-                                    rc = process_dec_val(value, topics[i].event[j].dec_operator, topics[i].event[j].opt_value);
+                            if (strcmp(topics->head_event->type, "decimal") == 0 && decider == 1) {
+                                    rc = process_dec_val(msg_value, topics->head_event->dec_operator, topics->head_event->opt_value);
+                            } else if (strcmp(topics->head_event->type, "string") == 0 && decider == 2) {
+                                    rc = process_str_val(msg_value, topics->head_event->str_operator, topics->head_event->opt_value);
+                            }
 
-                            if (strcmp(topics[i].event[j].type, "string") == 0)
-                                    rc = process_str_val(value, topics[i].event[j].dec_operator, topics[i].event[j].opt_value);
+                            if (rc == 0) {
+                                    send_mail(msg_value, topics->head_event->user_email, topics->head_event->username, topics->head_event->password,
+                                    topics->head_event->sender_email, topics->head_event->smtp_ip, topics->head_event->smtp_port, topics->head_event->secure,
+                                    topics->head_event->opt_value, topics->head_event->topic); //!< this or Linked List search function?
+                            }
                                     
-                            if (rc == 0)
-                                    send_mail(value, topics[i]);
-                    }        
-                    free(value);
+                            topics->head_event = topics->head_event->next;
+                    }
+                    free(msg_value);
             }
+            topics = topics->next;
     }
-
-   json_object_put(jobj);
+    json_object_put(jobj);
 
     return 0;
 }

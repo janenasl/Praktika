@@ -1,18 +1,14 @@
 #include "mqtt_db.h"
+sqlite3 *db;
 /**
-* checking if database table exists, if not creates one
-*/
+ * checking if database table exists, if not creates one
+ * @return: 0 || 1 - sucess, other - sqlite3 problems (see sqlite3 documentation)
+ */
 static int create_table_if_not_exist()
 {
     sqlite3_stmt *stmt = NULL;
     int rc = 0;
-    char *sql = NULL;
- 
-    sql = (char *) malloc(sizeof(char) * 100);
-    if (sql == NULL) {
-            fprintf(stderr, "sql malloc failed\n");
-            return -1;
-    }
+    char sql[100];
 
     sprintf(sql, "SELECT COUNT(TYPE) FROM sqlite_master WHERE TYPE='table' AND NAME='%s';", DB_TABLE);
 
@@ -33,35 +29,22 @@ static int create_table_if_not_exist()
                     goto cleanup;
             }
     }
+
     cleanup:
             sqlite3_finalize(stmt);
-            free(sql);
             return rc;
 }
-static char *time_stamp()
-{
-    time_t rawtime;
-    struct tm *timeinfo;
 
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-
-    return asctime(timeinfo);
-}
 /**
-* adds messages to database
-*/
+ * adds messages to database
+ * @return: 0 - success, -1 - allocation problems, other - sqlite3 problems (see sqlite3 documentation)
+ */
 static int create_table()
 {
-    int rc = 0;
-    char *sql = NULL;
     char *err_msg = NULL;
-
-    sql = (char *) malloc(sizeof(char) * 120);
-    if (sql == NULL) {
-            return -1;
-    }
-
+    int rc = 0;
+    char sql[120];
+    
     sprintf(sql, "CREATE TABLE '%s' (topic varchar(255), payload varchar(255), time varchar(100));", DB_TABLE);
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
@@ -72,15 +55,12 @@ static int create_table()
             
             return rc;
     }
-    if(sql != NULL) {
-            free(sql);
-            sql = NULL;
-    }
     return rc;
 }
 /**
-* Open a connection to a new or existing SQLite database (creates new if not exist)
-*/
+ * Open a connection to SQLite database (creates new if not exist)
+ * @return: 0 - success, 1 - failed to open database
+ */
 static int open_db()
 {
     int rc = 0;
@@ -88,52 +68,64 @@ static int open_db()
     rc = sqlite3_open(DB_FILE, &db);
     if (rc != SQLITE_OK) {
             fprintf(stderr, "could not open database file: %s\n", sqlite3_errmsg(db));
-            return -1;
+            return 1;
     }
     return 0;
 }
 /**
-* adds messages to database
-*/
+ * adds messages to database
+ * @return: 0 - success, 1 - open database failed, other - sqlite3 problems (see sqlite3 documentation)
+ */
 extern int add_message_to_db(char *topic, char *payload)
 {
-    char *message = NULL;
-    char *zErrMsg = NULL;
+    char *sql_message = NULL;
+    char *err_msg = NULL;
+    char *date = NULL;
     int rc = 0;
 
     rc = open_db();
-    if (rc != SQLITE_OK) {
-            return -1;
-    }
+    if (rc != SQLITE_OK)
+            return 1;
+
     rc = create_table_if_not_exist();
 
-    if (rc == 0) {
-            fprintf(stdout, "database table was created\n");
-    } else if (rc == 1) {
-            fprintf(stdout, "database table exist\n");
-    } else {
+    if (rc != 1 && rc != 0)
             goto cleanup;
-    }
 
-    message = (char *) malloc (sizeof(char) * (strlen(topic) + strlen(payload)+100));
-    if (message == NULL) {
-            rc = -1;
-            goto cleanup;
-    }
-    
-    sprintf(message, "INSERT INTO %s VALUES ('%s', '%s', '%s');", DB_TABLE, topic, payload, time_stamp());
+    date = time_stamp();
 
-    rc = sqlite3_exec(db, message, 0, 0, &zErrMsg);
+    sql_message = sqlite3_mprintf("INSERT INTO %s VALUES ('%q', '%q', '%q');", DB_TABLE, topic, payload, date);
+
+    rc = sqlite3_exec(db, sql_message, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
-            fprintf(stderr, "SQL error while adding message to DB: %s\n", zErrMsg);
-            sqlite3_free(zErrMsg);
+            fprintf(stderr, "SQL error while adding message to DB: %s\n", err_msg);
+            sqlite3_free(err_msg);
     }
 
-    if (message != NULL) {
-            free(message);
-            message = NULL;
-    }
+    sqlite3_free(sql_message);
     cleanup:
+            free(date);
             sqlite3_close(db);
             return rc;
+}
+
+/**
+ * return your computer date with time
+ * @return: date time
+ */
+static char *time_stamp()
+{
+    time_t rawtime;
+    struct tm *timeinfo;
+    char *date;
+    date = (char *) malloc(sizeof(char) * 35);
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    strcpy(date, asctime(timeinfo));
+
+    date[strcspn(date, "\n")] = 0; //!< used for removing \n symbol in the end
+
+    return date;
 }

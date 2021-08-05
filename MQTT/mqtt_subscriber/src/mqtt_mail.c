@@ -1,5 +1,6 @@
 #include "mqtt_mail.h"
 
+
 static size_t payload_source(void *ptr, size_t size, size_t nmemb, void *userp)
 {
   struct upload_status *upload_ctx = (struct upload_status *)userp;
@@ -20,15 +21,12 @@ static size_t payload_source(void *ptr, size_t size, size_t nmemb, void *userp)
 
   return 0;
 }
-
-extern int send_mail(char *value, struct topic topics)
+/**
+ * generate message template
+ * @return: NULL if failed, filled template if okay
+ */
+static char *create_template(char *value, char *user_mail, char *sender_email, char *topic, char *opt_value)
 {
-    CURL *curl;
-    CURLcode res = CURLE_OK;
-    struct curl_slist *recipients = NULL;
-    struct upload_status upload_ctx = { 0 };
-    char *smtp_server_url;
-    
     char payload_template[] =
     "To: %s\r\n"
     "From: %s\r\n"
@@ -38,38 +36,61 @@ extern int send_mail(char *value, struct topic topics)
     "\r\n\r\n";
 
     size_t payload_text_len = strlen(payload_template) +
-                    strlen(topics.event->user_email) +
-                    strlen(topics.event->sender_email) +
-                    strlen(topics.event->topic) +
-                    strlen(topics.event->opt_value) + strlen(value)+1;
+                    strlen(user_mail) +
+                    strlen(sender_email) +
+                    strlen(topic) +
+                    strlen(opt_value) + strlen(value)+1;
 
     char* payload_text = malloc(payload_text_len);
-    memset(payload_text, 0, payload_text_len);
-    sprintf(payload_text, payload_template, topics.event->user_email, topics.event->sender_email,
-                topics.event->topic, topics.event->opt_value, value);
 
+    if (payload_text == NULL)
+            return payload_text;
 
-    smtp_server_url = (char *) malloc(sizeof(char) * (strlen("smtp://") + strlen(topics.event->smtp_ip) + strlen(topics.event->smtp_port))+5);
-    sprintf(smtp_server_url, "smtp://%s:%s", topics.event->smtp_ip, topics.event->smtp_port);
+    sprintf(payload_text, payload_template, user_mail, sender_email, topic, opt_value, value);
 
+    return payload_text;
+}
+/**
+ * set options and send message to mail
+ * @return: 0 - success, 2 - allocation problems, 3 - sending letter failed
+ */
+extern int send_mail(char *value, char *user_email, char *username, char *password, char *sender_email,
+ char *smtp_ip, char *smtp_port, int secure, char *opt_value, char *topic)
+{
+    CURL *curl;
+    CURLcode res = CURLE_OK;
+    struct curl_slist *recipients = NULL;
+    struct upload_status upload_ctx = { 0 };
+    char *smtp_server_url;
+    
+    char *payload_text = create_template(value, user_email, sender_email, topic, opt_value);
+    if (payload_text == NULL) {
+            fprintf(stderr, "creating letter template failed\n");
+            return 2;
+    }
+    
+    smtp_server_url = (char *) malloc(sizeof(char) * (strlen("smtp://") + strlen(smtp_ip) + strlen(smtp_port))+5);
+    if (smtp_server_url == NULL)
+            return 2;
+    sprintf(smtp_server_url, "smtp://%s:%s", smtp_ip, smtp_port);
     curl = curl_easy_init();
     if(curl) {
             upload_ctx.readptr = payload_text;
             upload_ctx.sizeleft = (long)strlen(payload_text);
 
-            recipients = curl_slist_append(recipients, topics.event->user_email);
+            recipients = curl_slist_append(recipients, user_email);
 
-            curl_easy_setopt(curl, CURLOPT_USERNAME, topics.event->username);
-            curl_easy_setopt(curl, CURLOPT_PASSWORD, topics.event->password);
+            curl_easy_setopt(curl, CURLOPT_USERNAME, username);
+            curl_easy_setopt(curl, CURLOPT_PASSWORD, password);
             curl_easy_setopt(curl, CURLOPT_URL, smtp_server_url);
 
-            if(topics.event->secure == 1) {
+            if(secure == 1) {
                     curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
                     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
                     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);                    
             }
 
-            curl_easy_setopt(curl, CURLOPT_MAIL_FROM, topics.event->sender_email);
+            curl_easy_setopt(curl, CURLOPT_MAIL_FROM, sender_email);
             curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
             curl_easy_setopt(curl, CURLOPT_READFUNCTION, payload_source);
 
@@ -80,13 +101,13 @@ extern int send_mail(char *value, struct topic topics)
 
             if(res != CURLE_OK) {
                     fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-                    return -1;
+                    return 3;
             }
-    
-            printf("paėjo\n");
+            curl_global_cleanup();
             curl_slist_free_all(recipients);
             curl_easy_cleanup(curl);
     }
     free(payload_text);
     free(smtp_server_url);
+    return 0;
 }

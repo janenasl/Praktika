@@ -7,12 +7,30 @@
 
 #define CONFIG_FILE "/etc/config/mqtt_subs"
 
-struct topic
+struct event_node
 {
-        char name[200];
-        int qos;
-        int ec; // event count
-        struct events *event;
+    char topic[200];
+    char type[10];
+    char opt_value[200];
+    int dec_operator;
+    int str_operator;
+    char user_email[150];
+    char smtp_ip[30];
+    char smtp_port[10];
+    int credentials;
+    int secure;
+    char username[70];
+    char password[70];
+    char sender_email[200]; 
+    struct event_node *next;   
+};
+
+struct topic_node 
+{
+    char name[200];
+    int qos;
+    struct event_node *head_event;
+    struct topic_node *next;
 };
 
 struct settings 
@@ -30,31 +48,13 @@ struct settings
         char ca_cert[200];
 };
 
-struct events
-{
-        char topic[200];
-        char type[10];
-        char opt_value[200];
-        int dec_operator;
-        int str_operator;
-        char user_email[150];
-        char smtp_ip[30];
-        char smtp_port[10];
-        int credentials;
-        int secure;
-        char username[70];
-        char password[70];
-        char sender_email[200];
-};
-
-
-extern int iniciate_config_read(struct topic **topics, struct settings **settings);
-static int load_config(struct uci_package **p, char *config_name);
-static void set_settings(char *option_name, char *option_value, struct settings **settings);
-static void set_topics(char *opt_name, char *opt_value, int k, struct topic **topics);
-static void set_sender_settings(struct events *temp_event);
-static int set_events(int tc, struct topic **topics);
-static int read_config(struct topic **topics, struct settings **settings);
-static int count_topics();
+extern int iniciate_config_read(struct topic_node **alltopics, struct settings **settings);
+static int save_values(struct settings **settings, struct topic_node **alltopics, struct uci_context *ctx, struct uci_section *s);
+static int load_config(struct uci_package **p, struct uci_context **ctx, char *config_name);
+static int set_settings(struct uci_context *ctx, struct uci_section *s, struct settings **settings);
+static int set_topics(struct uci_context *ctx, struct uci_section *s, struct topic_node **topics);
+static int set_events(struct uci_context *ctx, struct uci_section *s, struct topic_node **topics);
+static int get_topics(struct uci_context *ctx, struct uci_package *p, struct topic_node **alltopics);
+static int set_sender_settings(struct event_node *temp_event, char *sender_name);
 
 #endif

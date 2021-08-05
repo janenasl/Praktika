@@ -1,14 +1,13 @@
 SRC:=$(wildcard *.c)
-OBJS:=$(SRC:.c=.o)
-LDFLAGS:=-lmosquitto -luci -lsqlite3 -ljson-c -lcurl
+LDFLAGS:=-lmosquitto -lsqlite3 -ljson-c -luci -lcurl
 BIN:=mqtt
 
 .PHONY: all clean
 
 all: $(BIN)
 
-$(BIN): $(OBJS)
+$(BIN): $(SRC)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 clean:
-	$(rm) $(BIN)
+	rm  $(OBJS)
