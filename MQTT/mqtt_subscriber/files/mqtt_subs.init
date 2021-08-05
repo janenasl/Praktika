@@ -12,6 +12,8 @@ start_service() {
 		procd_set_param command /usr/bin/mqtt
 		procd_set_param pidfile /var/run/mqtt_subs.pid
 		procd_set_param file /etc/config/mqtt_subs
+		procd_set_param stdout 1 
+  		procd_set_param stderr 1
 		procd_close_instance
 	fi
 }
