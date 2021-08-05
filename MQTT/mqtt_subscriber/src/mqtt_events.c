@@ -2,13 +2,7 @@
 #include "mqtt_mail.h"
 
 /**
- * decimal operators:
- * 0 - <
- * 1 - >
- * 2 - <=
- * 3 - >=
- * 4 - ==
- * 5 - !=
+ * decimal operators: shell script operators
  * @return: 0 - success, 1 - failure
  */
 static int process_dec_val(char *value, int dec_operator, char *event_value)
@@ -16,27 +10,27 @@ static int process_dec_val(char *value, int dec_operator, char *event_value)
     int sender_value = atoi(value);
     int event_value_converted = atoi(event_value);
     switch(dec_operator) {
-        case 0:
+        case lt:
                 if(sender_value < event_value_converted)
                         return 0;
                 break;
-        case 1:
+        case gt:
                 if(sender_value > event_value_converted)
                         return 0;        
                 break;
-        case 2:
+        case le:
                 if(sender_value <= event_value_converted)
                         return 0;        
                 break;
-        case 3:
+        case ge:
                 if(sender_value >= event_value_converted)
                         return 0;           
                 break;
-        case 4:
+        case eq:
                 if(sender_value == event_value_converted)
                         return 0;           
                 break;
-        case 5:
+        case ne:
                 if(sender_value != event_value_converted)
                         return 0;           
                 break;

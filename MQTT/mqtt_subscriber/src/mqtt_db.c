@@ -1,5 +1,4 @@
 #include "mqtt_db.h"
-sqlite3 *db;
 /**
  * checking if database table exists, if not creates one
  * @return: 0 || 1 - sucess, other - sqlite3 problems (see sqlite3 documentation)
@@ -61,7 +60,7 @@ static int create_table()
  * Open a connection to SQLite database (creates new if not exist)
  * @return: 0 - success, 1 - failed to open database
  */
-static int open_db()
+extern int open_db()
 {
     int rc = 0;
 
@@ -73,8 +72,20 @@ static int open_db()
     return 0;
 }
 /**
+ * close connection to database
+ * @return: 0 - success, 1 - failed to open database
+ */
+extern int close_db()
+{
+    if (sqlite3_close(db) != SQLITE_OK) {
+            db = NULL;
+            return 1;
+    }
+    return 0;
+}
+/**
  * adds messages to database
- * @return: 0 - success, 1 - open database failed, other - sqlite3 problems (see sqlite3 documentation)
+ * @return: 0 - success, other - sqlite3 problems (see sqlite3 documentation)
  */
 extern int add_message_to_db(char *topic, char *payload)
 {
@@ -82,10 +93,6 @@ extern int add_message_to_db(char *topic, char *payload)
     char *err_msg = NULL;
     char *date = NULL;
     int rc = 0;
-
-    rc = open_db();
-    if (rc != SQLITE_OK)
-            return 1;
 
     rc = create_table_if_not_exist();
 
@@ -105,7 +112,6 @@ extern int add_message_to_db(char *topic, char *payload)
     sqlite3_free(sql_message);
     cleanup:
             free(date);
-            sqlite3_close(db);
             return rc;
 }
 

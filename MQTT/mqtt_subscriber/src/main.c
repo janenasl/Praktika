@@ -1,6 +1,7 @@
 #include <signal.h>
 #include "mqtt_sub.h"
 #include "linked_list.h"
+#include "mqtt_db.h"
 #include <unistd.h>
 
 volatile sig_atomic_t deamonize = 1;
@@ -29,6 +30,9 @@ int main(void)
 
     if (subscribe_topics(&mosq, head) != 0)
             goto cleanup_1;
+
+    if (open_db() != 0)
+            goto cleanup_2;
     
     while (deamonize) {
         if (mosquitto_loop(mosq, -1, 1) != MOSQ_ERR_SUCCESS) {
@@ -40,6 +44,7 @@ int main(void)
     cleanup_1:
             mosquitto_disconnect(mosq);
     cleanup_2:
+            close_db();
             mosquitto_destroy(mosq);
             mosquitto_lib_cleanup();
     cleanup_3:
