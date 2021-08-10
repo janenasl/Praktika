@@ -1,0 +1,226 @@
+ndex: miniupnpd-2.2.2/Makefile
+===================================================================
+--- miniupnpd-2.2.2.orig/Makefile
++++ miniupnpd-2.2.2/Makefile
+@@ -83,6 +83,8 @@ endif # ifneq ($(IPTABLES_PCFILE_FOUND),
+ 
+ #LDLIBS += -lnfnetlink
+ 
+-# OpenWrt packager disables https server for IGD v2 and hardcodes libuuid support
+-ifeq ($(TARGET_OPENWRT),)
++LDLIBS += -lsqlite3
++
+
+ 
+Index: miniupnpd-2.2.2/objects.mk
+===================================================================
+--- miniupnpd-2.2.2.orig/objects.mk
++++ miniupnpd-2.2.2/objects.mk
+@@ -3,7 +3,7 @@ BASEOBJS = miniupnpd.o upnphttp.o upnpde
+            upnpredirect.o getifaddr.o daemonize.o \
+            options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
+            upnpglobalvars.o upnpevents.o upnputils.o getconnstatus.o \
+-           upnpstun.o upnppinhole.o pcplearndscp.o asyncsendto.o
++           upnpstun.o upnppinhole.o pcplearndscp.o asyncsendto.o savefailedpftodb.o
+ 
+ # sources in linux/ directory
+ LNXOBJS = getifstats.o ifacewatcher.o getroute.o
+Index: miniupnpd-2.2.2/savefailedpftodb.c
+===================================================================
+--- /dev/null
++++ miniupnpd-2.2.2/savefailedpftodb.c
+@@ -0,0 +1,145 @@
++#include "savefailedpftodb.h"
++#include <string.h>
++
++static sqlite3 *db;
++
++static int create_table_if_not_exist(void);
++static int create_table(void);
++static char *time_stamp(void);
++
++static int create_table_if_not_exist(void)
++{
++    sqlite3_stmt *stmt = NULL;
++    int rc = 0;
++    char sql[100];
++
++    sprintf(sql, "SELECT COUNT(TYPE) FROM sqlite_master WHERE TYPE='table' AND NAME='%s';", DB_TABLE);
++
++    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
++
++    if (rc != SQLITE_OK) {
++            fprintf(stderr, "error preparing sql statement\n");
++            goto cleanup;
++    }
++
++    sqlite3_step(stmt);
++    rc = sqlite3_column_int(stmt, 0);
++
++    if (rc == SQLITE_OK) {
++            rc = create_table();
++            if (rc != SQLITE_OK) {
++                    fprintf(stderr, "creating table failed\n");
++                    goto cleanup;
++            }
++    }
++
++    cleanup:
++            sqlite3_finalize(stmt);
++            return rc;
++}
++
++/**
++ * adds messages to database
++ * @return: 0 - success, -1 - allocation problems, other - sqlite3 problems (see sqlite3 documentation)
++ */
++static int create_table(void)
++{
++    char *err_msg = NULL;
++    int rc = 0;
++    char sql[70];
++    
++    sprintf(sql, "CREATE TABLE '%s' (port varchar(255), time varchar(100));", DB_TABLE);
++
++    rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
++
++    if (rc != SQLITE_OK) {
++            fprintf(stderr, "SQL error while creating table: %s\n", err_msg);
++            sqlite3_free(err_msg);
++            
++            return rc;
++    }
++    return rc;
++}
++
++/**
++ * Open a connection to SQLite database (creates new if not exist)
++ * @return: 0 - success, 1 - failed to open database
++ */
++int open_db(void)
++{
++    int rc = 0;
++
++    rc = sqlite3_open(DB_FILE, &db);
++    if (rc != SQLITE_OK) {
++            fprintf(stderr, "could not open database file: %s\n", sqlite3_errmsg(db));
++            return 1;
++    }
++
++    return 0;
++}
++
++/**
++ * adds messages to database
++ * @return: 0 - success, 1 - open database failed, other - sqlite3 problems (see sqlite3 documentation)
++ */
++int add_message_to_db(char *port)
++{
++    char *sql_message = NULL;
++    char *err_msg = NULL;
++    char *date = NULL;
++    int rc = 0;
++
++    rc = create_table_if_not_exist();
++
++    if (rc != 1 && rc != 0)
++            goto cleanup;
++
++    date = time_stamp();
++
++    sql_message = sqlite3_mprintf("INSERT INTO %s VALUES ('%q', '%q');", DB_TABLE, port, date);
++
++    rc = sqlite3_exec(db, sql_message, 0, 0, &err_msg);
++    if (rc != SQLITE_OK) {
++            fprintf(stderr, "SQL error while adding message to DB: %s\n", err_msg);
++            sqlite3_free(err_msg);
++    }
++
++    sqlite3_free(sql_message);
++    cleanup:
++            free(date);
++            return rc;
++}
++
++/**
++ * return your computer date with time
++ * @return: date time
++ */
++static char *time_stamp(void)
++{
++    time_t rawtime;
++    struct tm *timeinfo;
++    char *date;
++    date = (char *) malloc(sizeof(char) * 35);
++
++    time(&rawtime);
++    timeinfo = localtime(&rawtime);
++
++    strcpy(date, asctime(timeinfo));
++
++    date[strcspn(date, "\n")] = 0; //!< used for removing \n symbol in the end
++
++    return date;
++}
++
++/**
++ * close connection to database
++ * @return: 0 - success, 1 - failed to close database
++ */
++int close_db(void)
++{
++    if (sqlite3_close(db) != SQLITE_OK) {
++            db = NULL;
++            return 1;
++    }
++    return 0;
++}
+Index: miniupnpd-2.2.2/savefailedpftodb.h
+===================================================================
+--- /dev/null
++++ miniupnpd-2.2.2/savefailedpftodb.h
+@@ -0,0 +1,16 @@
++#ifndef SAVE_FAILED_PF_TO_DB_H
++#define SAVE_FAILED_PF_TO_DB_H //!< PF - Portforwarding
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <time.h>
++#include <sqlite3.h>
++
++#define DB_TABLE "failed_ports"
++#define DB_FILE "failed_port_openings_counter.db"
++
++int add_message_to_db(char *port);
++int close_db(void);
++int open_db(void);
++
++#endif
+Index: miniupnpd-2.2.2/upnpsoap.c
+===================================================================
+--- miniupnpd-2.2.2.orig/upnpsoap.c
++++ miniupnpd-2.2.2/upnpsoap.c
+@@ -559,19 +559,23 @@ AddPortMapping(struct upnphttp * h, cons
+ 		BuildSendAndCloseSoapResp(h, body, bodylen);
+ 		break;
+ 	case -4:
++		add_message_to_db(ext_port);
+ #ifdef IGD_V2
+ 		SoapError(h, 729, "ConflictWithOtherMechanisms");
+ 		break;
+ #endif /* IGD_V2 */
+ 	case -3:	/* not permitted */
++		add_message_to_db(ext_port);
+ #ifdef IGD_V2
+ 		SoapError(h, 606, "Action not authorized");
+ 		break;
+ #endif /* IGD_V2 */
+ 	case -2:	/* already redirected */
++		add_message_to_db(ext_port);
+ 		SoapError(h, 718, "ConflictInMappingEntry");
+ 		break;
+ 	default:
++		add_message_to_db(ext_port);
+ 		SoapError(h, 501, "ActionFailed");
+ 	}
+ }
