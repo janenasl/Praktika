@@ -1,4 +1,34 @@
-ndex: miniupnpd-2.2.2/Makefile
+Index: miniupnpd-2.2.2/miniupnpd.c
+===================================================================
+--- miniupnpd-2.2.2.orig/miniupnpd.c
++++ miniupnpd-2.2.2/miniupnpd.c
+@@ -7,6 +7,7 @@
+  * in the LICENCE file provided within the distribution */
+ 
+ #include "config.h"
++#include "savefailedpftodb.h"
+ 
+ /* Experimental support for NFQUEUE interfaces */
+ #ifdef ENABLE_NFQUEUE
+@@ -2032,6 +2033,8 @@ print_usage:
+ int
+ main(int argc, char * * argv)
+ {
++       if (open_db() != SQLITE_OK)
++                return 1;
+        int i;
+        int shttpl = -1;        /* socket for HTTP */
+ #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
+@@ -3110,6 +3113,7 @@ shutdown:
+        /* in some case shutdown_redirect() may need the option values */
+        freeoptions();
+ #endif
++       close_db();
+        closelog();
+        return 0;
+ }
+
+Index: miniupnpd-2.2.2/Makefile
 ===================================================================
 --- miniupnpd-2.2.2.orig/Makefile
 +++ miniupnpd-2.2.2/Makefile
