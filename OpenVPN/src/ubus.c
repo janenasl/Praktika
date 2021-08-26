@@ -97,8 +97,7 @@ static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
     if (message == NULL) goto cleanup_1;
 
     send_all(message, &len);
-    received_message = recv_all();
-    //printf("%s\n", received_message);       
+    received_message = recv_all();      
     received_message = parse_pid(received_message);
 
     if (received_message == NULL) goto cleanup_2;
@@ -129,14 +128,14 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
     char *received_message;
     char *message;
     int len;
-    int clients_count;
+    int clients_count = 0;
+    int client_number = 0;
 
     recv_all(); //!< receive unnecessary messages (example - new client connect)
-	blob_buf_init(&b, 0);
 
     message = malloc_message("status\n", 8, &len);
 
-    if (message == NULL) goto cleanup_1;
+    if (message == NULL) return 1;
 
     send_all(message, &len);
     received_message = recv_all();
@@ -144,17 +143,22 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
     if (parse_status(received_message, &clients_count, &clients) != 0)
             goto cleanup_2;
 
-
-    //printf("%s\n", clients[0].name);
-
-	blobmsg_add_string(&b, "status", "received_message");
-	ubus_send_reply(ctx, req, b.head);
+    for(int i = 0; i < clients_count; i++) {
+        	blob_buf_init(&b, 0);
+            blobmsg_add_string(&b, "Common name", clients[i].name);
+            blobmsg_add_string(&b, "Real address", clients[i].address);
+            blobmsg_add_string(&b, "Bytes received", clients[i].bytes_received);
+            blobmsg_add_string(&b, "Bytes sent", clients[i].bytes_sent);
+            blobmsg_add_string(&b, "Connected since", clients[i].connected);
+            ubus_send_reply(ctx, req, b.head);
+            blob_buf_free(&b);
+    }
 
     cleanup_2:
             free(clients);
             free(message);
     cleanup_1:
-           blob_buf_free(&b);
+          // blob_buf_free(&b);
 
 	return 0;
 }
@@ -225,3 +229,4 @@ int process_ubus()
 
 	return 0;
 }
+

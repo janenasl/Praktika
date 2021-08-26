@@ -71,27 +71,31 @@ int parse_status(char *message, int *clients_count, struct Clients **clients)
     if (*clients == NULL)
             return 1;
 
-    string_parse(mystring, &clients);
+    string_parse(mystring, clients);
 
     free(mystring);
 
     return 0;
 }
 
+/*
+ * split message when \n occur
+ */
 static int string_parse(char *string, struct Clients **clients)
 {
     char *token;
     int client_number = 0;
 
-    char temp[80];
-
-    while((token = strtok_r(string, "\r\n", &string))) {
-            //split_into_parts(token, client_number, clients);
+    while((token = strtok_r(string, "\n", &string))) {
+            split_into_parts(token, client_number, clients);
             client_number++;
     }
     return 0;
 }
 
+/*
+ * split line into parts
+ */
 static int split_into_parts(char *string, int client_number, struct Clients **clients)
 {
     char temp_string[80];
@@ -102,16 +106,17 @@ static int split_into_parts(char *string, int client_number, struct Clients **cl
     strcpy(temp_string, string);
 
     for (token = strtok_r(temp_string, ",", &rest);
-         token != NULL;
-         token = strtok_r(NULL, ",", &rest)) {
+            token != NULL;
+            token = strtok_r(NULL, ",", &rest)) {
+            remove_char(token);
             if (counter == 0) 
-                    strcpy((*clients)[client_number].name, "labas");
+                    strcpy((*clients)[client_number].name, token);
             if (counter == 1)
                     strcpy((*clients)[client_number].address, token);
             if (counter == 2)
-                    (*clients)[client_number].bytes_received = atoi(token);
+                    strcpy((*clients)[client_number].bytes_received, token);
             if (counter == 3)
-                    (*clients)[client_number].bytes_sent = atoi(token);
+                    strcpy((*clients)[client_number].bytes_sent, token);
             if (counter == 4)
                     strcpy((*clients)[client_number].connected, token); 
 
@@ -119,7 +124,11 @@ static int split_into_parts(char *string, int client_number, struct Clients **cl
     }
     return 0;
 }
-
+/*
+ * count lines and return clients count
+ * 8 - default number of lines if zero clients are connected.
+ * If client connects +2 lines are added to message.
+ */
 int count_lines(char *string)
 {
     int count = 0;

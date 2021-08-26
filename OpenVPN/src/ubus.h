@@ -4,8 +4,8 @@
 struct Clients {
         char name[40];
         char address[40];
-        int bytes_received;
-        int bytes_sent;
+        char bytes_received[25];
+        char bytes_sent[25];
         char connected[40];
 };
 
