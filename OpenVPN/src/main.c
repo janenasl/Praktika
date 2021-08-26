@@ -10,10 +10,6 @@
 #include "ubus.h"
 #include "main.h"
 
-#define CHUNK_SIZE 4000
-#define PORT 7505
-#define IP "127.0.0.1"
-
 int network_socket;
 
 int main(int argc , char *argv[])
@@ -54,6 +50,7 @@ char *recv_all()
 	int size_recv = 0, total_size= 0;
 	char *chunk;
     chunk = (char *) malloc(sizeof(char) * CHUNK_SIZE);
+    int count = 0;
 	
 	fcntl(network_socket, F_SETFL, O_NONBLOCK); 	//!< make socket non blocking
 	
@@ -61,9 +58,14 @@ char *recv_all()
             memset(chunk, 0, CHUNK_SIZE);
             if((size_recv = recv(network_socket, chunk, CHUNK_SIZE, 0)) < 0) {
                     usleep(100000); //!< wait some time, data might not be received.
+                    count++;
             } else {
                     total_size += size_recv;
-                    //printf("%s", chunk);
+                    break;
+            }
+
+            if(count > 2) {
+                    //fprintf(stderr, "no message is sent\n");
                     break;
             }
 	}
@@ -71,7 +73,7 @@ char *recv_all()
 	return chunk;
 }
 /**
- * 
+ * Send data to server, handle partial send
  */
 int send_all(char *buf, int *len)
 {

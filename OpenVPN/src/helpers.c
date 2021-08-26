@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "helpers.h"
+#include <stdio.h>
+
 
 /*
  * remove \n and \r from string for ubus printing
@@ -26,15 +28,50 @@ void remove_char(char *s)
  */
 char *parse_pid(char *message)
 {
-    char *parsed_messaged;
-    parsed_messaged = strchr(message, '=');
+    char *parsed_message;
+    parsed_message = strchr(message, '=');
 
-    if (parsed_messaged == NULL) return parsed_messaged;
+    if (parsed_message == NULL) return parsed_message;
 
-    parsed_messaged++;
-    remove_char(parsed_messaged);
+    parsed_message++;
+    remove_char(parsed_message);
 
-    return parsed_messaged;
+    return parsed_message;
+}
+
+/*
+ * parse received message and remove unnecessary characters
+ * default lines if no clients is connected = 8
+ */
+char *parse_status(char *message, int *count)
+{
+    char *parsed_message;
+
+    *count = count_lines(message)-8;
+
+    if (*count == 0 || parsed_message == NULL) {
+            strcpy(parsed_message, "no clients are connected");
+            return parsed_message;
+    }
+
+    remove_char(parsed_message);
+
+    return parsed_message;
+}
+/*
+ * count lines of given string
+ */
+int count_lines(char *string)
+{
+    int count = 0;
+    string = strchr(string, '\n');
+
+    while (string != NULL) {
+            string = strchr(string+1, '\n');
+            count++;
+    }
+
+    return count;
 }
 
 /*

@@ -12,7 +12,9 @@ static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg);
 
-              void remove_char(char *s);
+static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
+		      struct ubus_request_data *req, const char *method,
+		      struct blob_attr *msg);
 
 /*
  * Global variable which will be to store value
@@ -50,6 +52,7 @@ static const struct blobmsg_policy counter_policy[] = {
 
 static const struct ubus_method counter_methods[] = {
 	UBUS_METHOD("add", counter_add, counter_policy),
+    UBUS_METHOD_NOARG("status", status_get),
     UBUS_METHOD_NOARG("pid", pid_get)
 };
 
@@ -86,24 +89,19 @@ static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
     char *received_message;
     char *message;
     int len;
-	
+
+    recv_all(); //!< receive unnecessary messages (example - new client connect)
 	blob_buf_init(&b, 0);
 
     message = malloc_message("pid\n", 5, &len);
-
-    if (message == NULL)
-            goto cleanup_1;
+    if (message == NULL) goto cleanup_1;
 
     send_all(message, &len);
     received_message = recv_all();
-    
-    if (received_message == NULL)
-            goto cleanup_2;
-            
+    //printf("%s\n", received_message);       
     received_message = parse_pid(received_message);
 
-    if (received_message == NULL)
-            goto cleanup_2;
+    if (received_message == NULL) goto cleanup_2;
 
 	blobmsg_add_string(&b, "PID", received_message);
 	ubus_send_reply(ctx, req, b.head);
@@ -113,6 +111,50 @@ static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
     cleanup_1:
             blob_buf_free(&b);
             
+	return 0;
+}
+
+/*
+ * This method is used as a callback function to return the status
+ * First we send command (status) to server
+ * When we receive response we parse message for using it with ubus
+ * */
+static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
+		      struct ubus_request_data *req, const char *method,
+		      struct blob_attr *msg)
+{
+	struct blob_buf b = {};
+
+    struct Clients *clients = NULL;
+    char *received_message;
+    char *message;
+    int len;
+    int clients_count;
+
+    recv_all(); //!< receive unnecessary messages (example - new client connect)
+	blob_buf_init(&b, 0);
+
+    message = malloc_message("status\n", 8, &len);
+
+    if (message == NULL) goto cleanup_1;
+
+    send_all(message, &len);
+    received_message = recv_all();
+
+    if (parse_status(received_message, &clients_count, &clients) != 0)
+            goto cleanup_2;
+
+
+    //printf("%s\n", clients[0].name);
+
+	blobmsg_add_string(&b, "status", "received_message");
+	ubus_send_reply(ctx, req, b.head);
+
+    cleanup_2:
+            free(clients);
+            free(message);
+    cleanup_1:
+           blob_buf_free(&b);
 
 	return 0;
 }
@@ -183,4 +225,3 @@ int process_ubus()
 
 	return 0;
 }
-
