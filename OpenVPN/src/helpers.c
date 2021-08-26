@@ -3,6 +3,8 @@
 #include "helpers.h"
 #include <stdio.h>
 
+static int string_parse(char *string, struct Clients **clients);
+static int split_into_parts(char *string, int client_number, struct Clients **clients);
 
 /*
  * remove \n and \r from string for ubus printing
@@ -43,24 +45,81 @@ char *parse_pid(char *message)
  * parse received message and remove unnecessary characters
  * default lines if no clients is connected = 8
  */
-char *parse_status(char *message, int *count)
+int parse_status(char *message, int *clients_count, struct Clients **clients)
 {
-    char *parsed_message;
+    char *message_start = NULL;
+    char *message_end = NULL;
+    char *mystring = NULL;
 
-    *count = count_lines(message)-8;
+    *clients_count = count_lines(message);
 
-    if (*count == 0 || parsed_message == NULL) {
-            strcpy(parsed_message, "no clients are connected");
-            return parsed_message;
-    }
+    if (*clients_count == 0)
+            return 1;
 
-    remove_char(parsed_message);
+    message_start = strstr(message, "Since\r\n")+7;
+    message_end = strstr(message, "ROUTING TABLE\r\n");
 
-    return parsed_message;
+    mystring = (char *) malloc((sizeof(char) * 100) * (*clients_count));
+
+    if(mystring == NULL) return 1;
+
+    memmove(mystring, message_start, message_end - message_start-1);
+    mystring[message_end - message_start-1] = '\0';
+
+    *clients = (struct Clients *) calloc ((*clients_count), sizeof(struct Clients));
+
+    if (*clients == NULL)
+            return 1;
+
+    string_parse(mystring, &clients);
+
+    free(mystring);
+
+    return 0;
 }
-/*
- * count lines of given string
- */
+
+static int string_parse(char *string, struct Clients **clients)
+{
+    char *token;
+    int client_number = 0;
+
+    char temp[80];
+
+    while((token = strtok_r(string, "\r\n", &string))) {
+            //split_into_parts(token, client_number, clients);
+            client_number++;
+    }
+    return 0;
+}
+
+static int split_into_parts(char *string, int client_number, struct Clients **clients)
+{
+    char temp_string[80];
+    char *token;
+    char *rest = NULL;
+    int counter = 0;
+    
+    strcpy(temp_string, string);
+
+    for (token = strtok_r(temp_string, ",", &rest);
+         token != NULL;
+         token = strtok_r(NULL, ",", &rest)) {
+            if (counter == 0) 
+                    strcpy((*clients)[client_number].name, "labas");
+            if (counter == 1)
+                    strcpy((*clients)[client_number].address, token);
+            if (counter == 2)
+                    (*clients)[client_number].bytes_received = atoi(token);
+            if (counter == 3)
+                    (*clients)[client_number].bytes_sent = atoi(token);
+            if (counter == 4)
+                    strcpy((*clients)[client_number].connected, token); 
+
+            counter++;
+    }
+    return 0;
+}
+
 int count_lines(char *string)
 {
     int count = 0;
@@ -71,7 +130,7 @@ int count_lines(char *string)
             count++;
     }
 
-    return count;
+    return (count-8)/2;
 }
 
 /*
