@@ -2,8 +2,8 @@
 
 all information about openVPN management-interface commands: https://openvpn.net/community-resources/management-interface/
 
-**openVPN management-interface wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_MANAGEMENT** <br>
-**pkcs methods wont work on openWRT if openvpn source is build with disabled config OPENVPN_openssl_ENABLE_PKCS11**
+**1. openVPN management-interface wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_MANAGEMENT** <br><br>
+**2.pkcs methods wont work on openWRT if openvpn source is build with disabled config OPENVPN_openssl_ENABLE_PKCS11**
 
 
 show existing ubus methods: ubus -v list telnet
