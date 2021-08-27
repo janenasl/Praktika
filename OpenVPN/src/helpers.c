@@ -27,6 +27,19 @@ void remove_char(char *s)
     s[writer]=0;
 }
 
+char *parse_certs(char *message) 
+{
+    char *parsed_message;
+    parsed_message = strchr(message, ':');
+
+    if (parsed_message == NULL) return parsed_message;
+
+    parsed_message++;
+    remove_char(parsed_message);
+
+    return parsed_message;
+}
+
 /**
  * parse received message and remove unnecessary characters
  * @return parsed message on success, NULL if something failed 
@@ -158,6 +171,7 @@ static void split_into_parts(char *string, int client_number, struct Clients **c
             counter++;
     }
 }
+
 /**
  * count lines of given string
  * @return:
