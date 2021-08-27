@@ -15,12 +15,10 @@ int network_socket;
 int main(int argc , char *argv[])
 {
     struct sockaddr_in server;
-	char *message = NULL;
-    int len = 0;
 	
 	network_socket = socket(AF_INET , SOCK_STREAM , 0);
 	if (network_socket == -1) {
-            printf("Could not create socket");
+            fprintf(stderr, "Could not create socket\n");
             return 1;
     }
 	
@@ -32,9 +30,9 @@ int main(int argc , char *argv[])
             fprintf(stderr, "connection to network failed\n");
             goto cleanup;
 	}
-    
-    recv_all(); //!< receive first message that you get always when you connect
-    process_ubus();
+
+    if (process_ubus() != 0)
+            goto cleanup;
 	
     cleanup:
             close(network_socket);
@@ -42,15 +40,37 @@ int main(int argc , char *argv[])
 }
 
 /**
+ * Send data to server, handle partial send
+ * @return 0 - success; -1 - failure
+ */
+int send_all(char *buf, int *len)
+{
+    int total = 0;        //!< how many bytes we've sent
+    int bytes_left = *len; //!< how many we have left to send
+    int n;
+
+    while(total < *len) {
+        n = send(network_socket, buf+total, bytes_left, 0);
+        if (n == -1) { break; }
+        total += n;
+        bytes_left -= n;
+    }
+
+    *len = total; //!< return number actually sent here
+
+    return n == -1 ? -1 : 0;
+} 
+
+/**
  * Receive data in multiple chunks by checking a non-blocking socket
- * 
+ * @return received data on success, NULL incase of failure
  */
 char *recv_all()
 {
-	int size_recv = 0, total_size= 0;
+	int size_recv = 0, total_size= 0, count = 0;
 	char *chunk;
     chunk = (char *) malloc(sizeof(char) * CHUNK_SIZE);
-    int count = 0;
+    if (chunk == NULL) return NULL;
 	
 	fcntl(network_socket, F_SETFL, O_NONBLOCK); 	//!< make socket non blocking
 	
@@ -65,30 +85,9 @@ char *recv_all()
             }
 
             if(count > 2) {
-                    //fprintf(stderr, "no message is sent\n");
                     break;
             }
 	}
 	
 	return chunk;
 }
-/**
- * Send data to server, handle partial send
- */
-int send_all(char *buf, int *len)
-{
-    int total = 0;        // how many bytes we've sent
-    int bytesleft = *len; // how many we have left to send
-    int n;
-
-    while(total < *len) {
-        n = send(network_socket, buf+total, bytesleft, 0);
-        if (n == -1) { break; }
-        total += n;
-        bytesleft -= n;
-    }
-
-    *len = total; // return number actually sent here
-
-    return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
-} 

@@ -3,10 +3,12 @@
 #include "helpers.h"
 #include <stdio.h>
 
-static int string_parse(char *string, struct Clients **clients);
-static int split_into_parts(char *string, int client_number, struct Clients **clients);
+static void split_into_parts(char *string, int client_number, struct Clients **clients);
+static void logs_string_parse(char *string, struct Log_messages **logs);
+static void status_string_parse(char *string, struct Clients **clients);
+static int count_lines(char *string, int _case);
 
-/*
+/**
  * remove \n and \r from string for ubus printing
  */
 void remove_char(char *s)
@@ -25,8 +27,9 @@ void remove_char(char *s)
     s[writer]=0;
 }
 
-/*
+/**
  * parse received message and remove unnecessary characters
+ * @return parsed message on success, NULL if something failed 
  */
 char *parse_pid(char *message)
 {
@@ -41,9 +44,9 @@ char *parse_pid(char *message)
     return parsed_message;
 }
 
-/*
+/**
  * parse received message and remove unnecessary characters
- * default lines if no clients is connected = 8
+ * @return 0 - success; 1 - client count is zero; 2 - allocation problems
  */
 int parse_status(char *message, int *clients_count, struct Clients **clients)
 {
@@ -51,7 +54,7 @@ int parse_status(char *message, int *clients_count, struct Clients **clients)
     char *message_end = NULL;
     char *mystring = NULL;
 
-    *clients_count = count_lines(message);
+    *clients_count = count_lines(message, 0);
 
     if (*clients_count == 0)
             return 1;
@@ -69,19 +72,19 @@ int parse_status(char *message, int *clients_count, struct Clients **clients)
     *clients = (struct Clients *) calloc ((*clients_count), sizeof(struct Clients));
 
     if (*clients == NULL)
-            return 1;
+            return 2;
 
-    string_parse(mystring, clients);
+    status_string_parse(mystring, clients);
 
     free(mystring);
 
     return 0;
 }
 
-/*
- * split message when \n occur
+/**
+ * split message when \n occur and split tokens into parts
  */
-static int string_parse(char *string, struct Clients **clients)
+static void status_string_parse(char *string, struct Clients **clients)
 {
     char *token;
     int client_number = 0;
@@ -90,13 +93,46 @@ static int string_parse(char *string, struct Clients **clients)
             split_into_parts(token, client_number, clients);
             client_number++;
     }
+}
+
+/**
+ * parse logs received from server
+ * @return 0 - success; 1 - allocation problems
+ */
+int parse_logs(char *string, int *messages_count, struct Log_messages **logs)
+{
+    if (*messages_count == 0)
+            *messages_count = count_lines(string, 1);
+
+    *logs = (struct Log_messages *) malloc(sizeof(struct Log_messages) * (*messages_count));
+
+    if (logs == NULL)
+            return 1;
+
+    logs_string_parse(string, logs);
+
     return 0;
 }
 
-/*
+/**
+ * split message when \n occur
+ */
+static void logs_string_parse(char *string, struct Log_messages **logs)
+{
+    char *token;
+    int log_number = 0;
+
+    while((token = strtok_r(string, "\n", &string))) {
+            remove_char(token);
+            strcpy((*logs)[log_number].message, token);
+            log_number++;
+    }
+}
+
+/**
  * split line into parts
  */
-static int split_into_parts(char *string, int client_number, struct Clients **clients)
+static void split_into_parts(char *string, int client_number, struct Clients **clients)
 {
     char temp_string[80];
     char *token;
@@ -119,17 +155,19 @@ static int split_into_parts(char *string, int client_number, struct Clients **cl
                     strcpy((*clients)[client_number].bytes_sent, token);
             if (counter == 4)
                     strcpy((*clients)[client_number].connected, token); 
-
             counter++;
     }
-    return 0;
 }
-/*
- * count lines and return clients count
- * 8 - default number of lines if zero clients are connected.
- * If client connects +2 lines are added to message.
+/**
+ * count lines of given string
+ * @return:
+ * _case 0:
+ * 8 is default number of lines if zero clients are connected.
+ * If client connects +2 lines are added to message. Formula: (count-8)/2
+ * other:
+ * return normal count number
  */
-int count_lines(char *string)
+static int count_lines(char *string, int _case)
 {
     int count = 0;
     string = strchr(string, '\n');
@@ -139,17 +177,21 @@ int count_lines(char *string)
             count++;
     }
 
-    return (count-8)/2;
+    if (_case == 0)
+            count = (count-8)/2;
+
+    return count;
 }
 
-/*
+/**
  * malloc and copy given text to return_message 
  * set len pointer the value
+ * @return malloced message or NULL if failed
  */
-char *malloc_message(char *text, int size, int *len)
+char *malloc_message(char *text, int *len)
 {
     char *return_message;
-    return_message = (char *) malloc(sizeof(char) * size);
+    return_message = (char *) malloc(sizeof(text));
     if (return_message == NULL) return return_message;
 
 	strcpy(return_message, text);

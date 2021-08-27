@@ -9,7 +9,10 @@ struct Clients {
         char connected[40];
 };
 
+struct Log_messages {
+        char message[150]; //!< one line of log information
+};
+
 int process_ubus();
-char *parse_pid(char *message);
 
 #endif
