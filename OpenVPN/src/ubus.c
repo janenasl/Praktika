@@ -263,8 +263,6 @@ static int set_hold(struct ubus_context *ctx, struct ubus_object *obj,
 	if (!tb[COUNTER_VALUE])
 		return UBUS_STATUS_INVALID_ARGUMENT;
 
-	blob_buf_init(&b, 0);
-
 	strcpy(argument, blobmsg_get_string(tb[COUNTER_VALUE]));
     sprintf(command, "hold %s\n", argument);
  
@@ -277,6 +275,7 @@ static int set_hold(struct ubus_context *ctx, struct ubus_object *obj,
     if (received_message == NULL) goto cleanup;
 
     remove_char(received_message);
+    blob_buf_init(&b, 0);
     blobmsg_add_string(&b, "hold", received_message);
 	ubus_send_reply(ctx, req, b.head);
 
@@ -328,6 +327,7 @@ static int set_mute(struct ubus_context *ctx, struct ubus_object *obj,
     if (received_message == NULL) goto cleanup;
 
     remove_char(received_message);
+    blob_buf_init(&b, 0);
     blobmsg_add_string(&b, "mute", received_message);
 	ubus_send_reply(ctx, req, b.head);
 
@@ -359,4 +359,5 @@ int process_ubus()
 
 	return 0;
 }
+
 
