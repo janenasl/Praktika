@@ -24,7 +24,7 @@ show existing/implemented ubus commands: ubus -v list telnet
 **method:** ubus call telnet auth '{"auth":"string"}' <br>
       auth - show the current auth setting <br> 
       auth interact -  change the auth parameter to interactive <br>
-      auth non-interact -  change the auth parameter to non-interactive <br>
+      auth nointeract -  change the auth parameter to non-interactive <br>
       
 **method:** ubus call telnet kill '{"kill":"string"}' <br>
       kill common-name/source addres:port - kill a particlar client instance. <br> 
