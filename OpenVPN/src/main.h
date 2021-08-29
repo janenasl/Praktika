@@ -4,6 +4,7 @@
 #define CHUNK_SIZE 4000
 #define PORT 7505
 #define IP "127.0.0.1"
+#define ENABLE_PKCS 0
 
 char *recv_all();
 int send_all(char *buf, int *len);

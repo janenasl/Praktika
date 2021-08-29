@@ -27,27 +27,14 @@ void remove_char(char *s)
     s[writer]=0;
 }
 
-char *parse_certs(char *message) 
-{
-    char *parsed_message;
-    parsed_message = strchr(message, ':');
-
-    if (parsed_message == NULL) return parsed_message;
-
-    parsed_message++;
-    remove_char(parsed_message);
-
-    return parsed_message;
-}
-
 /**
- * parse received message and remove unnecessary characters
+ * if parsing is only needed for removing unnecessary symbol from received message, we use this method
  * @return parsed message on success, NULL if something failed 
  */
-char *parse_pid(char *message)
+char *parse_message(char *message, char symbol)
 {
     char *parsed_message;
-    parsed_message = strchr(message, '=');
+    parsed_message = strchr(message, symbol);
 
     if (parsed_message == NULL) return parsed_message;
 

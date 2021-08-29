@@ -1,12 +1,12 @@
-**controll your openvpn server through ubus!**
+**controll your openVPN server through ubus!**
 
 all information about openVPN management-interface commands: https://openvpn.net/community-resources/management-interface/
 
-**openVPN management-interface wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_MANAGEMENT
-**pkcs methods wont work on openWRT if openvpn source is build with disabled config OPENVPN_openssl_ENABLE_PKCS11**
+**openVPN management-interface wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_MANAGEMENT**
+**pkcs methods wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_PKCS11 and dont forget to enable it in main.h of this package**
 
 
-show existing ubus methods: ubus -v list telnet
+show existing/implemented ubus commands: ubus -v list telnet
 
 **method:** ubus call telnet log '{"value":integer}' <br>
       value 0 - show all messages <br>

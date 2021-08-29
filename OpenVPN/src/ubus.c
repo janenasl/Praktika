@@ -57,7 +57,7 @@ static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct blob_attr *msg);
 
 /**
- *The enumaration array is used to specifie how much arguments will our 
+ * The enumaration array is used to specifie how much arguments will our 
  * methods accepted. Also to say trough which index which argument will 
  * be reacheble.
  */
@@ -109,6 +109,7 @@ static const struct blobmsg_policy verb_policy[] = {
 static const struct blobmsg_policy pkcs_policy[] = {
 	[COUNTER_VALUE] = { .name = "index", .type = BLOBMSG_TYPE_INT32 },
 };
+
 /**
  * This structure is used to register available methods.
  * If a method accepts arguments, the method should have a policy.
@@ -123,9 +124,11 @@ static const struct ubus_method telnet_methods[] = {
     UBUS_METHOD("signal", set_signal, signal_policy),
     UBUS_METHOD("state", set_state, state_policy),
     UBUS_METHOD("verb", set_verb, state_policy),
+    #if ENABLE_PKCS
     UBUS_METHOD("pkcs_index", pkcs_index_get, pkcs_policy),
-    UBUS_METHOD_NOARG("status", status_get),
     UBUS_METHOD_NOARG("pkcs", pkcs_get),
+    #endif
+    UBUS_METHOD_NOARG("status", status_get),
     UBUS_METHOD_NOARG("pid", pid_get),
     UBUS_METHOD_NOARG("version", version_get)
 };
@@ -172,7 +175,7 @@ static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
 
     send_all(send_message, &len);
     received_message = recv_all();      
-    received_message = parse_pid(received_message);
+    received_message = parse_message(received_message, '=');
 
     if (received_message == NULL) goto cleanup_2;
 
@@ -190,9 +193,9 @@ static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 /**
- * This method is used as a callback function to return the PID
- * First we send command (pid) to server
- * When we receive response we parse message to use it with ubus
+ * This method is used as a callback function to return the version of openVPN server
+ * First we send command (version) to server
+ * When response is received, we clear unnecessary symbols from response to use it in ubus reply
  * @return 0 - on success; 1 - allocation problems
  */
 static int version_get(struct ubus_context *ctx, struct ubus_object *obj,
@@ -219,7 +222,7 @@ static int version_get(struct ubus_context *ctx, struct ubus_object *obj,
 	blobmsg_add_string(&b, "version", received_message);
 	ubus_send_reply(ctx, req, b.head);
 
-    //free(received_message);
+    free(received_message);
     cleanup_2:
             free(send_message);
     cleanup_1:
@@ -229,7 +232,7 @@ static int version_get(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 /**
- * This method is used as a callback function to return the certs count
+ * This method is used as a callback function to return the certificates count
  * First we send command (pkcs-id-count) to server
  * When we receive response we parse message to use it with ubus
  * @return 0 - on success; 1 - allocation problems
@@ -253,7 +256,7 @@ static int pkcs_get(struct ubus_context *ctx, struct ubus_object *obj,
 
     if(received_message == NULL) goto cleanup_1;
 
-    parse_certs(received_message);
+    parse_message(received_message, ':');
 
     blob_buf_init(&b, 0);
     blobmsg_add_string(&b, "pkcs", received_message);
@@ -362,7 +365,6 @@ static int log_info(struct ubus_context *ctx, struct ubus_object *obj,
 
     send_all(send_message, &len);
     received_message = recv_all();  
-
     if (received_message == NULL) goto cleanup;
 
     parse_logs(received_message, &number, &logs);
@@ -384,9 +386,10 @@ static int log_info(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 /**
- * This method is used as a callback function to return the log information
- * First we send command (log) to server
+ * This method is used as a callback function to return the state information
+ * First we send command (state) to server
  * When we receive response we parse message to use it with ubus
+ * note: state acts the same as logging function
  * @return 0 - on success; 1 - allocation problems
  */
 static int set_state(struct ubus_context *ctx, struct ubus_object *obj,
@@ -495,8 +498,8 @@ static int set_verb(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 /**
- * This method is used as a callback function to return verb information
- * First we send command (verb) to server
+ * This method is used as a callback function to return pkcs information
+ * First we send command (pkcs11-id-get) to server
  * When we receive response we parse message to use it with ubus
  * @return 0 - on success; 1 - allocation problems
  */
@@ -701,7 +704,7 @@ static int set_auth_retry(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 /**
- * This method is used as a callback function to return auth-retry information
+ * This method is used as a callback function to return kill information
  * First we send command (kill) to server
  * When we receive response we parse message to use it with ubus
  * @return 0 - on success; 1 - allocation problems
@@ -751,7 +754,7 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 /**
- * This method is used as a callback function to return auth-retry information
+ * This method is used as a callback function to return signal information
  * First we send command (signal) to server
  * When we receive response we parse message to use it with ubus
  * @return 0 - on success; 1 - allocation problems

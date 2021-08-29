@@ -67,24 +67,25 @@ int send_all(char *buf, int *len)
  */
 char *recv_all()
 {
-	int size_recv = 0, total_size= 0, count = 0;
+	int count = 0;
 	char *chunk;
+
+    if (fcntl(network_socket, F_SETFL, O_NONBLOCK) == -1) return NULL;
+
     chunk = (char *) malloc(sizeof(char) * CHUNK_SIZE);
     if (chunk == NULL) return NULL;
 	
-	fcntl(network_socket, F_SETFL, O_NONBLOCK); 	//!< make socket non blocking
-	
 	while(1) {
             memset(chunk, 0, CHUNK_SIZE);
-            if((size_recv = recv(network_socket, chunk, CHUNK_SIZE, 0)) < 0) {
+            if(recv(network_socket, chunk, CHUNK_SIZE, 0) < 0) {
                     usleep(100000); //!< wait some time, data might not be received.
                     count++;
             } else {
-                    total_size += size_recv;
                     break;
             }
 
-            if(count > 2) {
+            if(count > 3) {
+                    chunk = NULL;
                     break;
             }
 	}
