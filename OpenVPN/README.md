@@ -2,7 +2,7 @@
 
 all information about openVPN management-interface commands: https://openvpn.net/community-resources/management-interface/
 
-**openVPN management-interface wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_MANAGEMENT**
+**openVPN management-interface wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_MANAGEMENT** <br>
 **pkcs methods wont work on openWRT if openVPN source is build with disabled OPENVPN_openssl_ENABLE_PKCS11 and dont forget to enable it in main.h of this package**
 
 
