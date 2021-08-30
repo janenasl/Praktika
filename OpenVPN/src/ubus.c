@@ -1,5 +1,6 @@
 #include <libubox/blobmsg_json.h>
 #include <libubus.h>
+#include <unistd.h>
 #include "main.h"
 #include "ubus.h"
 #include "helpers.h"
@@ -55,6 +56,9 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
 static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg);
+
+struct ubus_context *ctx;
+int end_ubus();
 
 /**
  * The enumaration array is used to specifie how much arguments will our 
@@ -168,6 +172,9 @@ static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
     char *send_message = NULL;
     int len;
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 
     send_message = malloc_message("pid\n", &len);
@@ -207,6 +214,9 @@ static int version_get(struct ubus_context *ctx, struct ubus_object *obj,
     char *send_message = NULL;
     int len;
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 
     send_message = malloc_message("version\n", &len);
@@ -245,6 +255,9 @@ static int pkcs_get(struct ubus_context *ctx, struct ubus_object *obj,
     char *received_message = NULL;
     char *send_message = NULL;
     int len;
+
+    if (is_socket_alive() != 0)
+            end_ubus();
 
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 
@@ -290,7 +303,11 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
     int len;
     int pr = 0; //!< parse return
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
+    
 
     send_message = malloc_message("status\n", &len);
     if (send_message == NULL) return 1;
@@ -348,6 +365,9 @@ static int log_info(struct ubus_context *ctx, struct ubus_object *obj,
 
     char command[10]; //!< command that will be send to server
     int number = 0;
+
+    if (is_socket_alive() != 0)
+            end_ubus();
 
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	
@@ -407,6 +427,9 @@ static int set_state(struct ubus_context *ctx, struct ubus_object *obj,
     char command[10]; //!< command that will be send to server
     int number = 0;
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	
 	blobmsg_parse(state_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
@@ -464,6 +487,9 @@ static int set_verb(struct ubus_context *ctx, struct ubus_object *obj,
     char command[10]; //!< command that will be send to server
     int number = 0;
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	
 	blobmsg_parse(verb_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
@@ -516,6 +542,9 @@ static int pkcs_index_get(struct ubus_context *ctx, struct ubus_object *obj,
 
     char command[10]; //!< command that will be send to server
     int number = 0;
+
+    if (is_socket_alive() != 0)
+            end_ubus();
 
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	
@@ -570,6 +599,9 @@ static int set_hold(struct ubus_context *ctx, struct ubus_object *obj,
     char command[20]; //!< command that will be send to server
     char argument[10];
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(hold_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -620,6 +652,9 @@ static int set_mute(struct ubus_context *ctx, struct ubus_object *obj,
 
     char command[10]; //!< command that will be send to server
     int number = 0;
+
+    if (is_socket_alive() != 0)
+            end_ubus();
 
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	
@@ -673,6 +708,9 @@ static int set_auth_retry(struct ubus_context *ctx, struct ubus_object *obj,
     char command[20]; //!< command that will be send to server
     char argument[10];
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(auth_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -723,6 +761,9 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
     char command[20]; //!< command that will be send to server
     char argument[10];
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(kill_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -733,7 +774,7 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
     sprintf(command, "kill %s\n", argument);
  
     send_message = malloc_message(command, &len);
-    if (send_message == NULL) goto cleanup;
+    if (send_message == NULL) return 1;
 
     send_all(send_message, &len);
     received_message = recv_all();  
@@ -745,10 +786,10 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
     blobmsg_add_string(&b, "kill", received_message);
 	ubus_send_reply(ctx, req, b.head);
 
-    free(send_message);
     free(received_message);
+    blob_buf_free(&b);
     cleanup:
-	        blob_buf_free(&b);
+            free(send_message);
 
 	return 0;
 }
@@ -773,6 +814,9 @@ static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
     char command[20]; //!< command that will be send to server
     char argument[10];
 
+    if (is_socket_alive() != 0)
+            end_ubus();
+
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(signal_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -795,6 +839,8 @@ static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
     blobmsg_add_string(&b, "signal", received_message);
 	ubus_send_reply(ctx, req, b.head);
 
+    
+
     free(send_message);
     free(received_message);
     cleanup:
@@ -803,10 +849,15 @@ static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
 	return 0;
 }
 
+void end_ubus(void)
+{
+	ubus_free(ctx);
+	uloop_done();
+    exit(1);
+}
 
 int process_ubus()
 {
-	struct ubus_context *ctx;
 
 	uloop_init();
 
@@ -820,8 +871,7 @@ int process_ubus()
 	ubus_add_object(ctx, &telnet_object);
 	uloop_run();
 
-	ubus_free(ctx);
-	uloop_done();
+    end_ubus();
 
 	return 0;
 }

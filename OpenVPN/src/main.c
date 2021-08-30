@@ -35,8 +35,30 @@ int main(int argc , char *argv[])
             goto cleanup;
 	
     cleanup:
-            close(network_socket);
+            //close(network_socket);
 	return 0;
+}
+/**
+ * check if server is still up
+ * @return 0 - success, 1 - failed (server is down)
+ */
+int is_socket_alive(void)
+{
+    int error = 0;
+    socklen_t len = sizeof (error);
+    int retval = getsockopt (network_socket, SOL_SOCKET, SO_ERROR, &error, &len);
+
+    if (retval != 0) {
+            fprintf(stderr, "error getting socket error code: %s\n", strerror(retval));
+            return 1;
+    }
+
+    if (error != 0) {
+            fprintf(stderr, "socket error: %s\n", strerror(error));
+            return 1;
+    }
+
+    return 0;
 }
 
 /**
@@ -70,14 +92,14 @@ char *recv_all()
 	int count = 0;
 	char *chunk;
 
-    if (fcntl(network_socket, F_SETFL, O_NONBLOCK) == -1) return NULL;
+   // if (fcntl(network_socket, F_SETFL, O_NONBLOCK) == -1) return NULL;
 
     chunk = (char *) malloc(sizeof(char) * CHUNK_SIZE);
     if (chunk == NULL) return NULL;
 	
 	while(1) {
             memset(chunk, 0, CHUNK_SIZE);
-            if(recv(network_socket, chunk, CHUNK_SIZE, 0) < 0) {
+            if(recv(network_socket, chunk, CHUNK_SIZE, MSG_DONTWAIT) < 0) {
                     usleep(100000); //!< wait some time, data might not be received.
                     count++;
             } else {
