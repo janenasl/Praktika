@@ -1,80 +1,76 @@
 #include <stdlib.h>
 #include <string.h>
-#include "helpers.h"
 #include <stdio.h>
 
-static void split_into_parts(char *string, int client_number, struct Clients **clients);
+#include "helpers.h"
+#include "main.h"
+#include "linked_list.h"
+
 static void logs_string_parse(char *string, struct Log_messages **logs);
-static void status_string_parse(char *string, struct Clients **clients);
+static void status_string_parse(char *string);
+static void split_into_parts(char *string);
 static int count_lines(char *string, int _case);
 
 /**
- * remove \n and \r from string for ubus printing
+ * get status information from server
+ * parse message and fill structure with information
+ * @return 0 - success; 1 - allocation problems
  */
-void remove_char(char *s)
+int gather_status()
 {
-    int writer = 0, reader = 0;
+    char *send_message;
+    char *received_message;
+    int len = 0;
 
-    while (s[reader])
-    {
-            if (s[reader]!= '\n' && s[reader] != '\r') 
-            {   
-                    s[writer++] = s[reader];
-            }
+    send_message = malloc_message("status\n", &len);
+    if (send_message == NULL) return 1;
 
-            reader++;    
-    }
-    s[writer]=0;
-}
+    send_all(send_message, &len);
+    received_message = recv_all();
 
-/**
- * if parsing is only needed for removing unnecessary symbol from received message, we use this method
- * @return parsed message on success, NULL if something failed 
- */
-char *parse_message(char *message, char symbol)
-{
-    char *parsed_message;
-    parsed_message = strchr(message, symbol);
+    if (received_message == NULL) goto cleanup_1;
 
-    if (parsed_message == NULL) return parsed_message;
+    parse_status(received_message);
 
-    parsed_message++;
-    remove_char(parsed_message);
-
-    return parsed_message;
+    free(received_message);
+    cleanup_1:
+            free(send_message);
+    return 0;
 }
 
 /**
  * parse received message and remove unnecessary characters
  * @return 0 - success; 1 - client count is zero; 2 - allocation problems
  */
-int parse_status(char *message, int *clients_count, struct Clients **clients)
+int parse_status(char *message)
 {
     char *message_start = NULL;
     char *message_end = NULL;
     char *mystring = NULL;
+    int clients_count;
 
-    *clients_count = count_lines(message, 0);
+    clients_count = count_lines(message, 0);
 
-    if (*clients_count == 0)
+    if (clients_count == 0)
             return 1;
 
     message_start = strstr(message, "Since\r\n")+7;
     message_end = strstr(message, "ROUTING TABLE\r\n");
 
-    mystring = (char *) malloc((sizeof(char) * 100) * (*clients_count));
+    mystring = (char *) malloc((sizeof(char) * 100) * (clients_count));
 
     if(mystring == NULL) return 1;
 
     memmove(mystring, message_start, message_end - message_start-1);
     mystring[message_end - message_start-1] = '\0';
 
-    *clients = (struct Clients *) calloc ((*clients_count), sizeof(struct Clients));
+    if (clients != NULL) {
+            delete_list(clients);
+            clients = (struct Clients *) calloc(1,sizeof(struct Clients));
+    }
 
-    if (*clients == NULL)
-            return 2;
-
-    status_string_parse(mystring, clients);
+    if (clients_count > 0)
+            status_string_parse(mystring);
 
     free(mystring);
 
@@ -84,15 +80,106 @@ int parse_status(char *message, int *clients_count, struct Clients **clients)
 /**
  * split message when \n occur and split tokens into parts
  */
-static void status_string_parse(char *string, struct Clients **clients)
+static void status_string_parse(char *string)
 {
     char *token;
-    int client_number = 0;
 
     while((token = strtok_r(string, "\n", &string))) {
-            split_into_parts(token, client_number, clients);
-            client_number++;
+            split_into_parts(token);
     }
+}
+
+/**
+ * split line into parts
+ */
+static void split_into_parts(char *string)
+{
+    char temp_string[80];
+    char *token;
+    char *rest = NULL;
+    int counter = 0;
+
+    struct Clients *new_client;
+    struct Clients temp_client;
+    strcpy(temp_string, string);
+
+    for (token = strtok_r(temp_string, ",", &rest);
+            token != NULL;
+            token = strtok_r(NULL, ",", &rest)) {
+            remove_char(token);
+            if (counter == 0) 
+                    strcpy(temp_client.name, token);
+            else if (counter == 1)
+                    strcpy(temp_client.address, token);
+            else if (counter == 2)
+                    strcpy(temp_client.bytes_received, token);
+            else if (counter == 3)
+                    strcpy(temp_client.bytes_sent, token);
+            else if (counter == 4)
+                    strcpy(temp_client.connected, token); 
+            counter++;  
+    }
+    new_client = create_client(temp_client);
+    push_client(&clients, new_client);
+}
+/**
+ * receive version from server
+ * parse received message
+ * @return version information on success; NULL - allocation problems
+ */
+char *set_version()
+{
+    char *received_message = NULL;
+    char *send_message = NULL;
+    int len = 0;
+
+    recv_all(); //!< receive unnecessary messages (example - new client connect)
+
+    send_message = malloc_message("version\n", &len);
+    if (send_message == NULL) return NULL;
+
+    send_all(send_message, &len);
+    received_message = recv_all();      
+
+    if (received_message == NULL) goto cleanup;
+
+    received_message = parse_message(received_message, ':');
+
+    cleanup:
+            free(send_message);
+
+    return received_message;
+}
+
+/**
+ * receive pid from server
+ * parse received message
+ * @return pid number on success; 1 - allocation problems
+ */
+int set_pid()
+{
+    char *received_message = NULL;
+    char *send_message = NULL;
+    int pid = 0;
+    int len = 0;
+
+    recv_all(); //!< receive unnecessary messages (example - new client connect)
+
+    send_message = malloc_message("pid\n", &len);
+    if (send_message == NULL) return 1;
+
+    send_all(send_message, &len);
+    received_message = recv_all();      
+    received_message = parse_message(received_message, '=');
+    
+    if (received_message == NULL) goto cleanup_1;
+
+    pid = atoi(received_message);
+
+
+    cleanup_1:
+            free(send_message);
+    return pid;
 }
 
 /**
@@ -126,36 +213,6 @@ static void logs_string_parse(char *string, struct Log_messages **logs)
             remove_char(token);
             strcpy((*logs)[log_number].message, token);
             log_number++;
-    }
-}
-
-/**
- * split line into parts
- */
-static void split_into_parts(char *string, int client_number, struct Clients **clients)
-{
-    char temp_string[80];
-    char *token;
-    char *rest = NULL;
-    int counter = 0;
-    
-    strcpy(temp_string, string);
-
-    for (token = strtok_r(temp_string, ",", &rest);
-            token != NULL;
-            token = strtok_r(NULL, ",", &rest)) {
-            remove_char(token);
-            if (counter == 0) 
-                    strcpy((*clients)[client_number].name, token);
-            if (counter == 1)
-                    strcpy((*clients)[client_number].address, token);
-            if (counter == 2)
-                    strcpy((*clients)[client_number].bytes_received, token);
-            if (counter == 3)
-                    strcpy((*clients)[client_number].bytes_sent, token);
-            if (counter == 4)
-                    strcpy((*clients)[client_number].connected, token); 
-            counter++;
     }
 }
 
@@ -199,4 +256,40 @@ char *malloc_message(char *text, int *len)
     *len = strlen(return_message);
 
     return return_message;
+}
+
+/**
+ * remove \n and \r from string for ubus printing
+ */
+void remove_char(char *s)
+{
+    int writer = 0, reader = 0;
+
+    while (s[reader])
+    {
+            if (s[reader]!= '\n' && s[reader] != '\r') 
+            {   
+                    s[writer++] = s[reader];
+            }
+
+            reader++;    
+    }
+    s[writer]=0;
+}
+
+/**
+ * if parsing is only needed for removing unnecessary symbol from received message, we use this method
+ * @return parsed message on success, NULL if something failed 
+ */
+char *parse_message(char *message, char symbol)
+{
+    char *parsed_message;
+    parsed_message = strchr(message, symbol);
+
+    if (parsed_message == NULL) return parsed_message;
+
+    parsed_message++;
+    remove_char(parsed_message);
+
+    return parsed_message;
 }

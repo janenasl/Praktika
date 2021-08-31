@@ -35,7 +35,7 @@ int main(int argc , char *argv[])
             goto cleanup;
 	
     cleanup:
-            //close(network_socket);
+            close(network_socket);
 	return 0;
 }
 /**
@@ -92,14 +92,14 @@ char *recv_all()
 	int count = 0;
 	char *chunk;
 
-   // if (fcntl(network_socket, F_SETFL, O_NONBLOCK) == -1) return NULL;
+    if (fcntl(network_socket, F_SETFL, O_NONBLOCK) == -1) return NULL;
 
     chunk = (char *) malloc(sizeof(char) * CHUNK_SIZE);
     if (chunk == NULL) return NULL;
 	
 	while(1) {
             memset(chunk, 0, CHUNK_SIZE);
-            if(recv(network_socket, chunk, CHUNK_SIZE, MSG_DONTWAIT) < 0) {
+            if(recv(network_socket, chunk, CHUNK_SIZE, 0) < 0) {
                     usleep(100000); //!< wait some time, data might not be received.
                     count++;
             } else {
@@ -107,7 +107,7 @@ char *recv_all()
             }
 
             if(count > 3) {
-                    chunk = NULL;
+                    //chunk = NULL;
                     break;
             }
 	}
