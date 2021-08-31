@@ -9,14 +9,6 @@ static int log_info(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg);
 
-static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
-		      struct ubus_request_data *req, const char *method,
-		      struct blob_attr *msg);
-
-static int version_get(struct ubus_context *ctx, struct ubus_object *obj,
-		      struct ubus_request_data *req, const char *method,
-		      struct blob_attr *msg);
-
 static int pkcs_get(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg);
@@ -61,9 +53,6 @@ static void end_ubus();
 
 static struct uloop_timeout my_event_timer;
 struct ubus_context *ctx;
-static int pid;
-static char *version;
-
 /**
  * The enumaration array is used to specifie how much arguments will our 
  * methods accepted. Also to say trough which index which argument will 
@@ -124,21 +113,21 @@ static const struct blobmsg_policy pkcs_policy[] = {
  */
 
 static const struct ubus_method telnet_methods[] = {
+    #if WORKING
     UBUS_METHOD("log", log_info, log_policy),
     UBUS_METHOD("hold", set_hold, hold_policy),
     UBUS_METHOD("mute", set_mute, mute_policy),
     UBUS_METHOD("auth", set_auth_retry, auth_policy),
-    UBUS_METHOD("kill", set_kill, kill_policy),
     UBUS_METHOD("signal", set_signal, signal_policy),
     UBUS_METHOD("state", set_state, state_policy),
     UBUS_METHOD("verb", set_verb, state_policy),
+    #endif
+    UBUS_METHOD("dis_client", set_kill, kill_policy),
     #if ENABLE_PKCS
     UBUS_METHOD("pkcs_index", pkcs_index_get, pkcs_policy),
     UBUS_METHOD_NOARG("pkcs", pkcs_get),
     #endif
-    UBUS_METHOD_NOARG("status", status_get),
-    UBUS_METHOD_NOARG("pid", pid_get),
-    UBUS_METHOD_NOARG("version", version_get)
+    UBUS_METHOD_NOARG("clients", status_get)
 };
 
 /**
@@ -159,46 +148,6 @@ static struct ubus_object telnet_object = {
 	.methods = telnet_methods,
 	.n_methods = ARRAY_SIZE(telnet_methods),
 };
-
-
-/**
- * This method is used as a callback function to return the PID
- * First we send command (pid) to server
- * When we receive response we parse message to use it with ubus
- * @return 0 - on success; 1 - allocation problems
- */
-static int pid_get(struct ubus_context *ctx, struct ubus_object *obj,
-		      struct ubus_request_data *req, const char *method,
-		      struct blob_attr *msg)
-{
-	struct blob_buf b = {};
-
-	blob_buf_init(&b, 0);
-	blobmsg_add_u32(&b, "PID", pid);
-	ubus_send_reply(ctx, req, b.head);
-            
-	return 0;
-}
-
-/**
- * This method is used as a callback function to return the version of openVPN server
- * First we send command (version) to server
- * When response is received, we clear unnecessary symbols from response to use it in ubus reply
- * @return 0 - on success; 1 - allocation problems
- */
-static int version_get(struct ubus_context *ctx, struct ubus_object *obj,
-		      struct ubus_request_data *req, const char *method,
-		      struct blob_attr *msg)
-{
-	struct blob_buf b = {};
-
-	blob_buf_init(&b, 0);
-	blobmsg_add_string(&b, "version", version);
-	ubus_send_reply(ctx, req, b.head);
-    blob_buf_free(&b);
-            
-	return 0;
-}
 
 /**
  * This method is used as a callback function to return the certificates count
@@ -250,21 +199,14 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct blob_attr *msg)
 {
 	struct blob_buf b = {};
-    int gs = 0; //!< gathering status return code
+    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    int gs = 1; //!< gathering status return code
 
-    if (clients == NULL) {
+    if (clients == NULL)
             gs = gather_status();
-    }
-
-    if (gs == 1) {
-                blob_buf_init(&b, 0);
-            blobmsg_add_string(&b, "information", "No clients are connected this moment");
-            ubus_send_reply(ctx, req, b.head);
-            blob_buf_free(&b);
-    }
-
 
     while(clients != NULL && strlen(clients->name) > 0) {
+            gs = 0;
         	blob_buf_init(&b, 0);
             blobmsg_add_string(&b, "Common name", clients->name);
             blobmsg_add_string(&b, "Real address", clients->address);
@@ -274,6 +216,14 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
             ubus_send_reply(ctx, req, b.head);
             blob_buf_free(&b);
             clients = clients->next;
+    }
+
+    if (gs == 1) {
+            blob_buf_init(&b, 0);
+            blobmsg_add_string(&b, "information", "No clients are connected this moment");
+            ubus_send_reply(ctx, req, b.head);
+            blob_buf_free(&b);
+            return 0;
     }
 
 	return 0;
@@ -760,10 +710,6 @@ static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
 void end_ubus(void)
 {
 	ubus_free(ctx);
-    if (version != NULL) {
-            free(version);
-            version = NULL;
-    }
 	uloop_done();
     exit(1);
 }
@@ -775,6 +721,7 @@ void end_ubus(void)
  */
 static void event_handler(struct uloop_timeout *timeout)
 {
+
     if (is_socket_alive() != 0) {
             end_ubus();
             return ;
@@ -793,16 +740,10 @@ static void set_event(void)
     uloop_timeout_set(&my_event_timer, 1000);
 }
 /**
- * set pid and version because they never change during program run time
- * init ubus loop for process communication
+ * initiate ubus loop for process communication
  */
 int process_ubus()
 {
-    pid = set_pid();
-    version = set_version();
-    if (pid == 0 || version == NULL)
-            return 1;
-
 	uloop_init();
     set_event();
 

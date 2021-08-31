@@ -54,6 +54,11 @@ int parse_status(char *message)
 
     clients_count = count_lines(message, 0);
 
+    if (clients != NULL) {
+            delete_list(clients);
+            clients = NULL;
+    }
+
     if (clients_count == 0)
             return 1;
 
@@ -67,13 +72,7 @@ int parse_status(char *message)
     memmove(mystring, message_start, message_end - message_start-1);
     mystring[message_end - message_start-1] = '\0';
 
-    if (clients != NULL) {
-            delete_list(clients);
-            clients = (struct Clients *) calloc(1,sizeof(struct Clients));
-    }
-
-    if (clients_count > 0)
-            status_string_parse(mystring);
+    status_string_parse(mystring);
 
     free(mystring);
 
@@ -86,6 +85,12 @@ int parse_status(char *message)
 static void status_string_parse(char *string)
 {
     char *token;
+
+    if (clients != NULL) {
+            delete_list(clients);
+            clients = NULL;
+    }
+    clients = (struct Clients *) calloc(1,sizeof(struct Clients));
 
     while((token = strtok_r(string, "\n", &string))) {
             split_into_parts(token);
@@ -124,65 +129,6 @@ static void split_into_parts(char *string)
     }
     new_client = create_client(temp_client);
     push_client(&clients, new_client);
-}
-/**
- * receive version from server
- * parse received message
- * @return version information on success; NULL - allocation problems
- */
-char *set_version()
-{
-    char *received_message = NULL;
-    char *send_message = NULL;
-    int len = 0;
-
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
-
-    send_message = malloc_message("version\n", &len);
-    if (send_message == NULL) return NULL;
-
-    send_all(send_message, &len);
-    received_message = recv_all();      
-
-    if (received_message == NULL) goto cleanup;
-
-    received_message = parse_message(received_message, ':');
-
-    cleanup:
-            free(send_message);
-
-    return received_message;
-}
-
-/**
- * receive pid from server
- * parse received message
- * @return pid number on success; 1 - allocation problems
- */
-int set_pid()
-{
-    char *received_message = NULL;
-    char *send_message = NULL;
-    int pid = 0;
-    int len = 0;
-
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
-
-    send_message = malloc_message("pid\n", &len);
-    if (send_message == NULL) return 1;
-
-    send_all(send_message, &len);
-    received_message = recv_all();      
-    received_message = parse_message(received_message, '=');
-    
-    if (received_message == NULL) goto cleanup_1;
-
-    pid = atoi(received_message);
-
-
-    cleanup_1:
-            free(send_message);
-    return pid;
 }
 
 /**
