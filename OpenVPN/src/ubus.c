@@ -198,15 +198,12 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg)
 {
-    struct blob_buf b = {};
+	struct blob_buf b = {};
 
-    int gs = 1; //!< gathering status return code
+    int count = 0; //!< variable to tell if connected clients count are more than 0
 
-    if (clients == NULL)
-            gs = gather_status();
-
-    while(clients != NULL && strlen(clients->name) > 0) {
-            gs = 0;
+    while(clients != NULL) {
+            count = 1;
         	blob_buf_init(&b, 0);
             blobmsg_add_string(&b, "Common name", clients->name);
             blobmsg_add_string(&b, "Real address", clients->address);
@@ -218,7 +215,7 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
             clients = clients->next;
     }
 
-    if (gs == 1) {
+    if (count == 0) {
             blob_buf_init(&b, 0);
             blobmsg_add_string(&b, "information", "No clients are connected this moment");
             ubus_send_reply(ctx, req, b.head);
@@ -606,7 +603,7 @@ static int set_auth_retry(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 /**
- * This method is used as a callback function to return kill information
+ * This method is used as a callback function to return disconnected client information
  * First we send command (kill) to server
  * When we receive response we parse message to use it with ubus
  * @return 0 - on success; 1 - allocation problems
@@ -622,8 +619,8 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
     char *send_message = NULL;
     int len = 0;
 
+    char argument[10]; //!< user input
     char command[20]; //!< command that will be send to server
-    char argument[10];
 
     recv_all(); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(kill_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
@@ -717,11 +714,9 @@ void end_ubus(void)
  * event handler callback method.
  * checking if connection is still active
  * then gather information to fill status structure
- * if everything is okay we repeat this method every 3s
  */
 static void event_handler(struct uloop_timeout *timeout)
 {
-
     if (is_socket_alive() != 0) {
             end_ubus();
             return ;
@@ -732,7 +727,7 @@ static void event_handler(struct uloop_timeout *timeout)
     uloop_timeout_set(&my_event_timer, 400);
 }
 /**
- * setting event every 1s
+ * setting event after 1s
  */
 static void set_event(void)
 {

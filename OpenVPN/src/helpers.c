@@ -43,7 +43,7 @@ int gather_status()
 
 /**
  * parse received message and remove unnecessary characters
- * @return 0 - success; 1 - client count is zero; 2 - allocation problems
+ * @return 0 - success; 1 - client count is zero; 2 - allocation problems; 3 - strstr problems
  */
 int parse_status(char *message)
 {
@@ -55,19 +55,22 @@ int parse_status(char *message)
     clients_count = count_lines(message, 0);
 
     if (clients != NULL) {
-            delete_list(clients);
+            delete_list();
             clients = NULL;
     }
-
+    
     if (clients_count == 0)
             return 1;
 
     message_start = strstr(message, "Since\r\n")+7;
     message_end = strstr(message, "ROUTING TABLE\r\n");
 
+    if(message_start == NULL || message_end == NULL)
+            return 3;
+
     mystring = (char *) malloc((sizeof(char) * 100) * (clients_count));
 
-    if(mystring == NULL) return 1;
+    if(mystring == NULL) return 2;
 
     memmove(mystring, message_start, message_end - message_start-1);
     mystring[message_end - message_start-1] = '\0';
@@ -87,10 +90,9 @@ static void status_string_parse(char *string)
     char *token;
 
     if (clients != NULL) {
-            delete_list(clients);
+            delete_list();
             clients = NULL;
     }
-    clients = (struct Clients *) calloc(1,sizeof(struct Clients));
 
     while((token = strtok_r(string, "\n", &string))) {
             split_into_parts(token);

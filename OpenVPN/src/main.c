@@ -32,8 +32,8 @@ int main(int argc , char *argv[])
 	}
 
     if (process_ubus() != 0)
-            goto cleanup;
-	
+            return 1;
+    
     cleanup:
             close(network_socket);
 	return 0;

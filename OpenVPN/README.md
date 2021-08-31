@@ -26,8 +26,8 @@ show existing/implemented ubus commands: ubus -v list telnet
       auth interact -  change the auth parameter to interactive <br>
       auth nointeract -  change the auth parameter to non-interactive <br>
       
-**method:** ubus call telnet kill '{"kill":"string"}' <br>
-      kill common-name/source addres:port - kill a particlar client instance. <br> 
+**method:** ubus call telnet dis_client '{"kill":"string"}' <br>
+      kill common-name/source addres:port - disconnect a particlar client instance. <br> 
       
 **method:** ubus call telnet signal '{"signal":"string"}' <br>
       signal **signal name** - set signal <br> 
@@ -44,7 +44,7 @@ show existing/implemented ubus commands: ubus -v list telnet
 **method:** ubus call telnet pkcs_index '{"index":"Integer"}' <br>
       index **n** - retrieve certificate by index **n** <br>
       
-**method:** ubus call telnet status <br>
+**method:** ubus call telnet clients <br>
       get information about connected clients <br>
       
 **method:** ubus call telnet pid <br>
