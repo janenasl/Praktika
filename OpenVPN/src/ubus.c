@@ -729,7 +729,7 @@ static void event_handler(struct uloop_timeout *timeout)
 
     gather_status();
 
-    uloop_timeout_set(&my_event_timer, 0);
+    uloop_timeout_set(&my_event_timer, 400);
 }
 /**
  * setting event every 1s
