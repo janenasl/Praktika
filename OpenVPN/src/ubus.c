@@ -200,13 +200,10 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
 {
     struct blob_buf b = {};
 
-    int gs = 1; //!< gathering status return code
-
-    if (clients == NULL)
-            gs = gather_status();
+    int count = 1;
 
     while(clients != NULL && strlen(clients->name) > 0) {
-            gs = 0;
+            count = 0;
         	blob_buf_init(&b, 0);
             blobmsg_add_string(&b, "Common name", clients->name);
             blobmsg_add_string(&b, "Real address", clients->address);
@@ -218,7 +215,7 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
             clients = clients->next;
     }
 
-    if (gs == 1) {
+    if (count == 1) {
             blob_buf_init(&b, 0);
             blobmsg_add_string(&b, "information", "No clients are connected this moment");
             ubus_send_reply(ctx, req, b.head);
