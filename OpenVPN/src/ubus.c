@@ -199,7 +199,6 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct blob_attr *msg)
 {
 	struct blob_buf b = {};
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
     int gs = 1; //!< gathering status return code
 
     if (clients == NULL)
