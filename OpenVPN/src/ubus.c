@@ -198,7 +198,8 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg)
 {
-	struct blob_buf b = {};
+    struct blob_buf b = {};
+
     int gs = 1; //!< gathering status return code
 
     if (clients == NULL)
@@ -728,7 +729,7 @@ static void event_handler(struct uloop_timeout *timeout)
 
     gather_status();
 
-    uloop_timeout_set(&my_event_timer, 3000);
+    uloop_timeout_set(&my_event_timer, 0);
 }
 /**
  * setting event every 1s
