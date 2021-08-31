@@ -250,13 +250,19 @@ static int status_get(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct blob_attr *msg)
 {
 	struct blob_buf b = {};
+    int gs = 0; //!< gathering status return code
 
     if (clients == NULL) {
-            blob_buf_init(&b, 0);
-            blobmsg_add_string(&b, "information", "client information not gathered yet or there are no clients");
+            gs = gather_status();
+    }
+
+    if (gs == 1) {
+                blob_buf_init(&b, 0);
+            blobmsg_add_string(&b, "information", "No clients are connected this moment");
             ubus_send_reply(ctx, req, b.head);
             blob_buf_free(&b);
     }
+
 
     while(clients != NULL && strlen(clients->name) > 0) {
         	blob_buf_init(&b, 0);
@@ -769,8 +775,6 @@ void end_ubus(void)
  */
 static void event_handler(struct uloop_timeout *timeout)
 {
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
-
     if (is_socket_alive() != 0) {
             end_ubus();
             return ;

@@ -14,28 +14,31 @@ static int count_lines(char *string, int _case);
 /**
  * get status information from server
  * parse message and fill structure with information
- * @return 0 - success; 1 - allocation problems
+ * @return 0 - success; 1 - client count is 0; 2 - allocation problems
  */
 int gather_status()
 {
     char *send_message;
     char *received_message;
     int len = 0;
+    int rc = 0; //return code
+
+    recv_all(); //!< receive unnecessary messages (example - new client connect)
 
     send_message = malloc_message("status\n", &len);
-    if (send_message == NULL) return 1;
+    if (send_message == NULL) return 2;
 
     send_all(send_message, &len);
     received_message = recv_all();
 
     if (received_message == NULL) goto cleanup_1;
 
-    parse_status(received_message);
+    rc = parse_status(received_message);
 
     free(received_message);
     cleanup_1:
             free(send_message);
-    return 0;
+    return rc;
 }
 
 /**
