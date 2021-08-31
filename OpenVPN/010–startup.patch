@@ -1,0 +1,9 @@
+Index: openvpn/files/openvpn.init
+===================================================================
+--- openvpn.orig/files/openvpn.init
++++ openvpn/files/openvpn.init
+@@ -251,3 +251,4 @@ start_service() {
+ service_triggers() {
+ 	procd_add_reload_trigger openvpn
+ }
++/etc/init.d/sockets start
