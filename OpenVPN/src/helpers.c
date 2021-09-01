@@ -23,13 +23,13 @@ int gather_status()
     int len = 0;
     int rc = 0; //return code
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 
     send_message = malloc_message("status\n", &len);
     if (send_message == NULL) return 2;
 
     send_all(send_message, &len);
-    received_message = recv_all();
+    received_message = recv_all(0);
 
     if (received_message == NULL) goto cleanup_1;
 

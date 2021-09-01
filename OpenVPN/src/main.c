@@ -85,9 +85,11 @@ int send_all(char *buf, int *len)
 
 /**
  * Receive data in multiple chunks by checking a non-blocking socket
+ * mode 0 - normal mode;
+ * mode 1 - instantly free allocation because this method was called just to flush junk value
  * @return received data on success, NULL incase of failure
  */
-char *recv_all()
+char *recv_all(int mode)
 {
 	int count = 0;
 	char *chunk;
@@ -100,17 +102,23 @@ char *recv_all()
 	while(1) {
             memset(chunk, 0, CHUNK_SIZE);
             if(recv(network_socket, chunk, CHUNK_SIZE, 0) < 0) {
-                    usleep(100000); //!< wait some time, data might not be received.
+                    sleep(0.5); //!< wait some time, data might not be received.
                     count++;
             } else {
                     break;
             }
 
             if(count > 3) {
-                    //chunk = NULL;
+                    free(chunk);
+                    chunk = NULL;
                     break;
             }
 	}
+
+    if (mode == 1 && chunk != NULL) {
+            free(chunk);
+            chunk == NULL;
+    }
 	
 	return chunk;
 }

@@ -7,7 +7,7 @@
 #define ENABLE_PKCS 0
 #define WORKING 0
 
-char *recv_all();
+char *recv_all(int mode);
 int is_socket_alive();
 int send_all(char *buf, int *len);
 

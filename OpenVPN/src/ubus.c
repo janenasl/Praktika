@@ -164,13 +164,13 @@ static int pkcs_get(struct ubus_context *ctx, struct ubus_object *obj,
     char *send_message = NULL;
     int len = 0;
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 
     send_message = malloc_message("pkcs11-id-count\n", &len);
     if (send_message == NULL) return 1;
 
     send_all(send_message, &len);
-    received_message = recv_all();
+    received_message = recv_all(0);
 
     if(received_message == NULL) goto cleanup_1;
 
@@ -246,7 +246,7 @@ static int log_info(struct ubus_context *ctx, struct ubus_object *obj,
     char command[10]; //!< command that will be send to server
     int number = 0;
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	
 	blobmsg_parse(log_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -261,7 +261,7 @@ static int log_info(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
     if (received_message == NULL) goto cleanup;
 
     parse_logs(received_message, &number, &logs);
@@ -304,7 +304,7 @@ static int set_state(struct ubus_context *ctx, struct ubus_object *obj,
     char command[10]; //!< command that will be send to server
     int number = 0;
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	
 	blobmsg_parse(state_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -319,7 +319,7 @@ static int set_state(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
@@ -361,7 +361,7 @@ static int set_verb(struct ubus_context *ctx, struct ubus_object *obj,
     char command[10]; //!< command that will be send to server
     int number = 0;
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	
 	blobmsg_parse(verb_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -377,7 +377,7 @@ static int set_verb(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
@@ -414,7 +414,7 @@ static int pkcs_index_get(struct ubus_context *ctx, struct ubus_object *obj,
     char command[10]; //!< command that will be send to server
     int number = 0;
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	
 	blobmsg_parse(pkcs_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -430,7 +430,7 @@ static int pkcs_index_get(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
@@ -467,7 +467,7 @@ static int set_hold(struct ubus_context *ctx, struct ubus_object *obj,
     char command[20]; //!< command that will be send to server
     char argument[10];
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(hold_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
 	if (!tb[COUNTER_VALUE])
@@ -480,7 +480,7 @@ static int set_hold(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
@@ -520,7 +520,7 @@ static int set_mute(struct ubus_context *ctx, struct ubus_object *obj,
     char command[10]; //!< command that will be send to server
     int number = 0;
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	
 	blobmsg_parse(mute_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
@@ -535,7 +535,7 @@ static int set_mute(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
@@ -572,7 +572,7 @@ static int set_auth_retry(struct ubus_context *ctx, struct ubus_object *obj,
     char command[20]; //!< command that will be send to server
     char argument[10];
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(auth_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
 	if (!tb[COUNTER_VALUE])
@@ -585,7 +585,7 @@ static int set_auth_retry(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
@@ -622,7 +622,7 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
     char argument[10]; //!< user input
     char command[20]; //!< command that will be send to server
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(kill_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
 	if (!tb[COUNTER_VALUE])
@@ -635,7 +635,7 @@ static int set_kill(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) return 1;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
@@ -672,7 +672,7 @@ static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
     char command[20]; //!< command that will be send to server
     char argument[10];
 
-    recv_all(); //!< receive unnecessary messages (example - new client connect)
+    recv_all(1); //!< receive unnecessary messages (example - new client connect)
 	blobmsg_parse(signal_policy, __COUNTER_MAX, tb, blob_data(msg), blob_len(msg));
 	
 	if (!tb[COUNTER_VALUE])
@@ -685,7 +685,7 @@ static int set_signal(struct ubus_context *ctx, struct ubus_object *obj,
     if (send_message == NULL) goto cleanup;
 
     send_all(send_message, &len);
-    received_message = recv_all();  
+    received_message = recv_all(0);  
 
     if (received_message == NULL) goto cleanup;
 
